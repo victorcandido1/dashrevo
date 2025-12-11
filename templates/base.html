@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}REVO Flight Analytics{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        [x-cloak] { display: none !important; }
+        
+        :root {
+            --primary: #0f172a;
+            --accent: #3b82f6;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+        
+        body {
+            font-family: 'DM Sans', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+        }
+        
+        .glass {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .glass-dark {
+            background: rgba(15, 23, 42, 0.8);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .kpi-card {
+            background: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.95) 100%);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .kpi-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+        
+        .tab-active {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #1e293b;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+        
+        /* Plotly chart styling */
+        .js-plotly-plot .plotly {
+            border-radius: 8px;
+        }
+    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="text-slate-800">
+    <nav class="glass-dark text-white shadow-xl sticky top-0 z-50">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-lg flex items-center justify-center">
+                        <span class="text-xl">🚁</span>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold tracking-tight">REVO Analytics</h1>
+                        <p class="text-xs text-slate-400">Flight Operations Dashboard</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div id="data-status" class="text-sm bg-slate-700/50 px-4 py-2 rounded-lg flex items-center space-x-2">
+                        <span class="w-2 h-2 bg-slate-500 rounded-full" id="status-indicator"></span>
+                        <span id="status-text">Aguardando dados</span>
+                    </div>
+                    <div class="text-xs text-slate-400">
+                        {{ now().strftime('%d/%m/%Y') if now is defined else '' }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+    
+    <main class="container mx-auto px-6 py-8">
+        {% block content %}{% endblock %}
+    </main>
+    
+    <footer class="glass-dark text-slate-400 text-center py-4 mt-8">
+        <p class="text-sm">REVO Flight Analytics Dashboard v2.0 | Built with Flask + Alpine.js + Plotly</p>
+    </footer>
+    
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

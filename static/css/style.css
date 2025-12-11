@@ -1,0 +1,212 @@
+/* REVO Flight Analytics - Custom Styles */
+
+/* KPI Card Styles */
+.kpi-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: var(--accent);
+}
+
+.kpi-card.blue::before { background: linear-gradient(90deg, #3b82f6, #06b6d4); }
+.kpi-card.green::before { background: linear-gradient(90deg, #10b981, #34d399); }
+.kpi-card.purple::before { background: linear-gradient(90deg, #8b5cf6, #a78bfa); }
+.kpi-card.orange::before { background: linear-gradient(90deg, #f59e0b, #fbbf24); }
+.kpi-card.pink::before { background: linear-gradient(90deg, #ec4899, #f472b6); }
+.kpi-card.cyan::before { background: linear-gradient(90deg, #06b6d4, #22d3ee); }
+
+/* Tab Navigation */
+.tab-nav {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 1rem;
+}
+
+.tab-btn {
+    padding: 0.5rem 1rem;
+    border-radius: 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.tab-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.tab-btn.active {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+}
+
+/* Chart Container */
+.chart-container {
+    background: white;
+    border-radius: 1rem;
+    padding: 1rem;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+/* Form Inputs */
+input[type="number"],
+input[type="text"],
+input[type="file"] {
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+input[type="number"]:focus,
+input[type="text"]:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    outline: none;
+}
+
+/* Checkbox Styling */
+input[type="checkbox"] {
+    accent-color: #3b82f6;
+}
+
+/* Button Styles */
+.btn-primary {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    padding: 0.5rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.btn-primary:hover {
+    box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background: #e2e8f0;
+    color: #475569;
+    padding: 0.5rem 1.5rem;
+    border-radius: 0.5rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+    background: #cbd5e1;
+}
+
+/* Export Buttons */
+.export-btn {
+    transition: all 0.2s;
+}
+
+.export-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+}
+
+/* Log Container */
+.log-container {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 0.75rem;
+    line-height: 1.5;
+}
+
+/* Loading Animation */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.loading {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Status Indicator */
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.status-dot.success {
+    background: #10b981;
+    box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+}
+
+.status-dot.warning {
+    background: #f59e0b;
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+}
+
+.status-dot.error {
+    background: #ef4444;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .tab-nav {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    .kpi-card {
+        padding: 1rem;
+    }
+}
+
+/* Animation for data updates */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+    animation: fadeIn 0.3s ease-out;
+}
+
+/* Glass morphism panels */
+.panel {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 1rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Section headers */
+.section-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.section-header h2 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.section-header .icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #3b82f6, #06b6d4);
+    border-radius: 0.75rem;
+    font-size: 1.25rem;
+}

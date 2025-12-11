@@ -1,0 +1,14 @@
+{
+  "EC135": {
+    "fixed_cost_per_hour": 7844.0,
+    "fuel_cost_per_hour": 1974.0,
+    "monthly_fixed_cost": 0.0,
+    "capacity": 5
+  },
+  "EC155": {
+    "fixed_cost_per_hour": 7844.0,
+    "fuel_cost_per_hour": 3008.0,
+    "monthly_fixed_cost": 0.0,
+    "capacity": 8
+  }
+}

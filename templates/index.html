@@ -1,0 +1,3057 @@
+{% extends "base.html" %}
+
+{% block title %}Flight Dashboard - REVO Analytics{% endblock %}
+
+{% block content %}
+<div x-data="dashboardApp()" x-init="init()">
+    <!-- File Upload Section (Collapsible) - Hidden if data already loaded -->
+    <div x-show="!dataLoaded" class="bg-white rounded-lg shadow-md mb-6">
+        <button @click="showUpload = !showUpload" class="w-full px-6 py-4 flex justify-between items-center">
+            <h2 class="text-xl font-bold">📂 Upload de Arquivo</h2>
+            <span x-text="showUpload ? '▼' : '▶'" class="text-gray-500"></span>
+        </button>
+        <div x-show="showUpload" x-transition class="px-6 pb-6">
+            <form @submit.prevent="uploadFile" enctype="multipart/form-data" class="space-y-4">
+                <div class="flex items-center space-x-4">
+                    <input type="file" @change="handleFileSelect" accept=".xlsx,.xls" 
+                           class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    <button type="submit" :disabled="uploading" 
+                            class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 whitespace-nowrap">
+                        <span x-show="!uploading">Upload</span>
+                        <span x-show="uploading">Processando...</span>
+                    </button>
+                </div>
+            </form>
+            <div x-show="uploadMessage" x-text="uploadMessage" 
+                 :class="uploadSuccess ? 'text-green-600 mt-2' : 'text-red-600 mt-2'"></div>
+        </div>
+    </div>
+    
+    <!-- Tab Navigation - All 14 Tabs -->
+    <div class="bg-white rounded-lg shadow-md mb-6 overflow-x-auto">
+        <div class="border-b border-gray-200">
+            <nav class="flex px-4 min-w-max" aria-label="Tabs">
+                <template x-for="tab in tabs" :key="tab.id">
+                    <button @click="activeTab = tab.id; loadTabData(tab.id)" 
+                            :class="activeTab === tab.id ? 'border-blue-500 text-blue-600 bg-blue-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                            class="whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm transition-colors">
+                        <span x-text="tab.icon + ' ' + tab.name"></span>
+                    </button>
+                </template>
+            </nav>
+        </div>
+    </div>
+    
+    <!-- Tab Content -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <!-- Dashboard Tab -->
+        <div x-show="activeTab === 'dashboard'" x-cloak>
+            <h2 class="text-2xl font-bold mb-4">📊 Dashboard Geral</h2>
+            <div x-show="!dataLoaded" class="text-center py-12 text-gray-500">
+                <p class="text-lg">Por favor, faça upload de um arquivo Excel para começar.</p>
+            </div>
+            <div x-show="dataLoaded">
+                <!-- KPI Cards Row 1 -->
+                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6" id="kpi-cards"></div>
+                <!-- Category Summary -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div id="category-distribution-chart" class="h-80"></div>
+                    <div id="revenue-by-category-chart" class="h-80"></div>
+                </div>
+                <!-- Time Charts -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div id="monthly-revenue-chart" class="h-80"></div>
+                    <div id="flight-types-chart" class="h-80"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Filters Tab -->
+        <div x-show="activeTab === 'filters'" x-cloak>
+            <h2 class="text-2xl font-bold mb-4">🔍 Filtros</h2>
+            <div x-show="!dataLoaded" class="text-center py-12 text-gray-500">
+                <p>Carregue os dados primeiro para usar os filtros.</p>
+            </div>
+            <div x-show="dataLoaded" class="space-y-6">
+                <!-- Filter Controls -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <!-- Flight Types -->
+                    <div class="border rounded-lg p-4">
+                        <h3 class="font-bold mb-2">Tipo de Voo</h3>
+                        <div class="max-h-48 overflow-y-auto space-y-1">
+                            <template x-for="type in filterOptions.flight_types" :key="type">
+                                <label class="flex items-center space-x-2 text-sm">
+                                    <input type="checkbox" :value="type" x-model="selectedFilters.flight_types" class="rounded">
+                                    <span x-text="type"></span>
+                                </label>
+                            </template>
+                        </div>
+                    </div>
+                    
+                    <!-- Aircraft Models -->
+                    <div class="border rounded-lg p-4">
+                        <h3 class="font-bold mb-2">Modelo de Aeronave</h3>
+                        <div class="space-y-1">
+                            <template x-for="model in filterOptions.aircraft_models" :key="model">
+                                <label class="flex items-center space-x-2 text-sm">
+                                    <input type="checkbox" :value="model" x-model="selectedFilters.aircraft_models" class="rounded">
+                                    <span x-text="model"></span>
+                                </label>
+                            </template>
+                        </div>
+                    </div>
+                    
+                    <!-- Months -->
+                    <div class="border rounded-lg p-4">
+                        <h3 class="font-bold mb-2">Meses</h3>
+                        <div class="grid grid-cols-4 gap-2">
+                            <template x-for="(month, idx) in filterOptions.month_names" :key="idx">
+                                <label class="flex items-center space-x-1 text-sm">
+                                    <input type="checkbox" :value="idx + 1" x-model="selectedFilters.months" class="rounded">
+                                    <span x-text="month"></span>
+                                </label>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Additional Filters Row -->
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Receita Mínima</label>
+                        <input type="number" x-model="selectedFilters.revenue_min" placeholder="0" class="w-full border rounded px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Receita Máxima</label>
+                        <input type="number" x-model="selectedFilters.revenue_max" placeholder="∞" class="w-full border rounded px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Pax Mínimo</label>
+                        <input type="number" x-model="selectedFilters.pax_min" placeholder="0" class="w-full border rounded px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Pax Máximo</label>
+                        <input type="number" x-model="selectedFilters.pax_max" placeholder="∞" class="w-full border rounded px-3 py-2">
+                    </div>
+                </div>
+                
+                <!-- Checkboxes -->
+                <div class="flex flex-wrap gap-4">
+                    <label class="flex items-center space-x-2">
+                        <input type="checkbox" x-model="selectedFilters.include_empty_leg" class="rounded">
+                        <span>Incluir Empty Legs</span>
+                    </label>
+                    <label class="flex items-center space-x-2">
+                        <input type="checkbox" x-model="selectedFilters.include_hangar_flight" class="rounded">
+                        <span>Incluir Hangar Flights</span>
+                    </label>
+                </div>
+                
+                <!-- Apply Button -->
+                <div class="flex space-x-4">
+                    <button @click="applyFilters" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                        Aplicar Filtros
+                    </button>
+                    <button @click="resetFilters" class="bg-gray-300 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-400">
+                        Resetar
+                    </button>
+                </div>
+                
+                <!-- Current Filter Status -->
+                <div class="bg-gray-50 p-4 rounded-lg">
+                    <p class="text-sm text-gray-600">
+                        Registros filtrados: <span class="font-bold" x-text="filteredRecords.toLocaleString()"></span>
+                    </p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Costs Tab -->
+        <div x-show="activeTab === 'costs'" x-cloak>
+            <h2 class="text-2xl font-bold mb-4">💵 Configuração de Custos</h2>
+            <div class="space-y-6">
+                <!-- Explanation -->
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p class="text-blue-800">
+                        <strong>ℹ️ Configure os custos por aeronave</strong> para calcular automaticamente o custo de cada voo.
+                        Os custos são divididos em: custo fixo por hora, custo de combustível por hora, e custo fixo mensal.
+                    </p>
+                </div>
+                
+                <!-- Cost Configuration Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- EC135 -->
+                    <div class="border-2 border-blue-200 rounded-lg p-6 bg-gradient-to-br from-blue-50 to-white">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-xl font-bold text-blue-800">🚁 EC135</h3>
+                            <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm">5 assentos</span>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Custo Fixo por Hora (R$)</label>
+                                <input type="number" x-model="costs.EC135.fixed_cost_per_hour" step="0.01" 
+                                       class="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Custo Combustível por Hora (R$)</label>
+                                <input type="number" x-model="costs.EC135.fuel_cost_per_hour" step="0.01"
+                                       class="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Custo Fixo Mensal (R$)</label>
+                                <input type="number" x-model="costs.EC135.monthly_fixed_cost" step="0.01"
+                                       class="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            <div class="bg-blue-100 rounded-lg p-3 mt-4">
+                                <p class="text-sm text-blue-800">
+                                    <strong>Custo Total/Hora:</strong> 
+                                    R$ <span x-text="(parseFloat(costs.EC135.fixed_cost_per_hour || 0) + parseFloat(costs.EC135.fuel_cost_per_hour || 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2})"></span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- EC155 -->
+                    <div class="border-2 border-emerald-200 rounded-lg p-6 bg-gradient-to-br from-emerald-50 to-white">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-xl font-bold text-emerald-800">🚁 EC155</h3>
+                            <span class="bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full text-sm">8 assentos</span>
+                        </div>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Custo Fixo por Hora (R$)</label>
+                                <input type="number" x-model="costs.EC155.fixed_cost_per_hour" step="0.01"
+                                       class="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Custo Combustível por Hora (R$)</label>
+                                <input type="number" x-model="costs.EC155.fuel_cost_per_hour" step="0.01"
+                                       class="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Custo Fixo Mensal (R$)</label>
+                                <input type="number" x-model="costs.EC155.monthly_fixed_cost" step="0.01"
+                                       class="w-full border rounded-lg px-4 py-2 focus:ring-2 focus:ring-emerald-500">
+                            </div>
+                            <div class="bg-emerald-100 rounded-lg p-3 mt-4">
+                                <p class="text-sm text-emerald-800">
+                                    <strong>Custo Total/Hora:</strong> 
+                                    R$ <span x-text="(parseFloat(costs.EC155.fixed_cost_per_hour || 0) + parseFloat(costs.EC155.fuel_cost_per_hour || 0)).toLocaleString('pt-BR', {minimumFractionDigits: 2})"></span>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="flex space-x-4">
+                    <button @click="saveCosts" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold">
+                        💾 Salvar e Recalcular Custos
+                    </button>
+                    <button @click="loadCosts" class="bg-gray-200 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-300">
+                        🔄 Recarregar
+                    </button>
+                </div>
+                
+                <!-- Cost Summary (when data is loaded) -->
+                <div x-show="dataLoaded && costSummary.total_cost > 0" class="mt-8">
+                    <h3 class="text-lg font-bold mb-4">📊 Resumo de Custos Calculados</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600">Custo Total</p>
+                            <p class="text-2xl font-bold text-gray-800">R$ <span x-text="costSummary.total_cost?.toLocaleString('pt-BR', {minimumFractionDigits: 2}) || '0'"></span></p>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600">Custos Fixos</p>
+                            <p class="text-2xl font-bold text-blue-600">R$ <span x-text="costSummary.total_fixed_cost?.toLocaleString('pt-BR', {minimumFractionDigits: 2}) || '0'"></span></p>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600">Custos Combustível</p>
+                            <p class="text-2xl font-bold text-orange-600">R$ <span x-text="costSummary.total_fuel_cost?.toLocaleString('pt-BR', {minimumFractionDigits: 2}) || '0'"></span></p>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600">Custo Médio/Voo</p>
+                            <p class="text-2xl font-bold text-purple-600">R$ <span x-text="costSummary.avg_cost_per_flight?.toLocaleString('pt-BR', {minimumFractionDigits: 2}) || '0'"></span></p>
+                        </div>
+                    </div>
+                    
+                    <!-- By Aircraft -->
+                    <div x-show="costSummary.by_aircraft" class="mt-6">
+                        <h4 class="font-bold mb-3">Por Aeronave</h4>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-100">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left">Modelo</th>
+                                        <th class="px-4 py-2 text-right">Voos</th>
+                                        <th class="px-4 py-2 text-right">Horas</th>
+                                        <th class="px-4 py-2 text-right">Custo Total</th>
+                                        <th class="px-4 py-2 text-right">Custo/Hora</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="(data, model) in costSummary.by_aircraft" :key="model">
+                                        <tr class="border-b">
+                                            <td class="px-4 py-2 font-medium" x-text="model"></td>
+                                            <td class="px-4 py-2 text-right" x-text="data.flights?.toLocaleString()"></td>
+                                            <td class="px-4 py-2 text-right" x-text="data.hours?.toFixed(1)"></td>
+                                            <td class="px-4 py-2 text-right">R$ <span x-text="data.total_cost?.toLocaleString('pt-BR', {minimumFractionDigits: 2})"></span></td>
+                                            <td class="px-4 py-2 text-right">R$ <span x-text="data.avg_cost_per_hour?.toLocaleString('pt-BR', {minimumFractionDigits: 2})"></span></td>
+                                        </tr>
+                                    </template>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Time Analysis Tab -->
+        <div x-show="activeTab === 'time'">
+            <h2 class="text-2xl font-bold mb-4">⏰ Análise Temporal & Sazonalidade</h2>
+            <div x-show="!dataLoaded" class="text-center py-12 text-gray-500">
+                <p>Carregue os dados primeiro.</p>
+            </div>
+            <!-- Sub-tabs for Time Analysis - Always visible -->
+            <div class="flex flex-wrap gap-2 mb-6 border-b pb-2" x-show="activeTab === 'time'">
+                    <button @click="timeSubTab = 'weekday'; loadTimeSubTab('weekday')" :class="timeSubTab === 'weekday' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'" class="px-4 py-2 rounded-lg font-medium text-sm">
+                        📅 Dias da Semana
+                    </button>
+                    <button @click="timeSubTab = 'monthly'; loadTimeSubTab('monthly')" :class="timeSubTab === 'monthly' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'" class="px-4 py-2 rounded-lg font-medium text-sm">
+                        📊 Mensal
+                    </button>
+                    <button @click="timeSubTab = 'seasonality'; loadTimeSubTab('seasonality')" :class="timeSubTab === 'seasonality' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'" class="px-4 py-2 rounded-lg font-medium text-sm">
+                        🌡️ Sazonalidade
+                    </button>
+                    <button @click="timeSubTab = 'hourly'; loadTimeSubTab('hourly')" :class="timeSubTab === 'hourly' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'" class="px-4 py-2 rounded-lg font-medium text-sm">
+                        ⏰ Por Hora
+                    </button>
+            </div>
+            
+            <div x-show="dataLoaded">
+                <!-- Weekday Analysis -->
+                <div x-show="timeSubTab === 'weekday'">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div id="weekday-comparison-chart" class="h-80 bg-white rounded-lg"></div>
+                        <div id="weekday-revenue-chart" class="h-80 bg-white rounded-lg"></div>
+                    </div>
+                    <div class="mt-6" id="weekday-stats"></div>
+                </div>
+                
+                <!-- Monthly Trends -->
+                <div x-show="timeSubTab === 'monthly'">
+                    <div id="monthly-trends-chart" class="h-96 bg-white rounded-lg"></div>
+                </div>
+                
+                <!-- Seasonality Analysis -->
+                <div x-show="timeSubTab === 'seasonality'">
+                    <!-- Category Selector -->
+                    <div class="flex gap-2 mb-4">
+                        <button @click="seasonalityCategory = 'all'; loadSeasonality()" :class="seasonalityCategory === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-100'" class="px-3 py-1 rounded text-sm">
+                            Todos
+                        </button>
+                        <button @click="seasonalityCategory = 'shuttle'; loadSeasonality()" :class="seasonalityCategory === 'shuttle' ? 'bg-green-500 text-white' : 'bg-gray-100'" class="px-3 py-1 rounded text-sm">
+                            Shuttle
+                        </button>
+                        <button @click="seasonalityCategory = 'charter'; loadSeasonality()" :class="seasonalityCategory === 'charter' ? 'bg-red-500 text-white' : 'bg-gray-100'" class="px-3 py-1 rounded text-sm">
+                            Charter
+                        </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 gap-6">
+                        <div>
+                            <h3 class="font-bold mb-2">Voos Diários com Médias Móveis (7 e 30 dias)</h3>
+                            <div id="seasonality-daily-chart" class="h-80 bg-white rounded-lg"></div>
+                        </div>
+                        <div>
+                            <h3 class="font-bold mb-2">Padrão Semanal</h3>
+                            <div id="seasonality-dow-chart" class="h-64 bg-white rounded-lg"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Hourly Distribution -->
+                <div x-show="timeSubTab === 'hourly'">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div id="hourly-distribution-chart" class="h-80 bg-white rounded-lg"></div>
+                        <div id="time-of-day-chart" class="h-80 bg-white rounded-lg"></div>
+                    </div>
+                    <div>
+                        <h3 class="font-bold mb-2">Heatmap: Hora x Dia da Semana</h3>
+                        <div id="hourly-heatmap" class="h-64 bg-white rounded-lg"></div>
+                    </div>
+                </div>
+            </div>
+            <div x-show="!dataLoaded && activeTab === 'time'" class="text-center py-12 text-gray-500">
+                <p>Carregue os dados primeiro para ver as análises temporais.</p>
+            </div>
+        </div>
+        
+        <!-- Fleet Analysis Tab -->
+        <div x-show="activeTab === 'fleet'" x-cloak>
+            <h2 class="text-2xl font-bold mb-4">✈️ Análise de Frota & Ociosidade</h2>
+            <div x-show="dataLoaded">
+                <!-- Idle Analysis Summary -->
+                <div class="bg-gradient-to-r from-orange-50 to-yellow-50 rounded-lg p-4 mb-6" id="idle-summary">
+                    <h3 class="font-bold text-orange-800 mb-3">⏱️ Análise de Ociosidade</h3>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="idle-stats"></div>
+                </div>
+                
+                <!-- Charts Row 1 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <h3 class="font-bold mb-2">Uso por Aeronave</h3>
+                        <div id="aircraft-usage-chart" class="h-80 bg-white rounded-lg"></div>
+                    </div>
+                    <div>
+                        <h3 class="font-bold mb-2">Receita por Aeronave</h3>
+                        <div id="aircraft-revenue-chart" class="h-80 bg-white rounded-lg"></div>
+                    </div>
+                </div>
+                
+                <!-- Idle Chart -->
+                <div class="mb-6">
+                    <h3 class="font-bold mb-2">Taxa de Utilização Mensal</h3>
+                    <div id="idle-monthly-chart" class="h-80 bg-white rounded-lg"></div>
+                </div>
+                
+                <!-- Aircraft KPIs Table -->
+                <div id="aircraft-stats" class="mt-6"></div>
+            </div>
+        </div>
+        
+        <!-- Route Analysis Tab -->
+        <div x-show="activeTab === 'routes'" x-cloak>
+            <h2 class="text-2xl font-bold mb-4">🗺️ Análise de Rotas</h2>
+            <div x-show="dataLoaded">
+                <div id="top-routes-chart" class="h-96 mb-6"></div>
+                <div id="routes-table" class="overflow-x-auto"></div>
+            </div>
+        </div>
+        
+        <!-- Shuttle Deep Dive Tab -->
+        <div x-show="activeTab === 'shuttle'" x-cloak>
+            <h2 class="text-2xl font-bold mb-4">🚁 Shuttle Deep Dive</h2>
+            <div x-show="dataLoaded">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div id="shuttle-breakdown-chart" class="h-80"></div>
+                    <div id="shuttle-load-factor-chart" class="h-80"></div>
+                </div>
+                <div id="shuttle-stats"></div>
+            </div>
+        </div>
+        
+        <!-- KPI Dashboard Tab -->
+        <div x-show="activeTab === 'kpi'">
+            <h2 class="text-2xl font-bold mb-4">📈 KPI Dashboard</h2>
+            
+            <!-- Sub-tabs for KPI - Always visible -->
+            <div class="flex flex-wrap gap-2 mb-4 border-b pb-2" x-show="activeTab === 'kpi'">
+                <button @click="kpiSubTab = 'general'; loadKPISubTab('general')" :class="kpiSubTab === 'general' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                    📊 KPI Geral
+                </button>
+                <button @click="kpiSubTab = 'gregorio'; loadKPISubTab('gregorio')" :class="kpiSubTab === 'gregorio' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                    📈 Gregorio's KPI
+                </button>
+                <button @click="kpiSubTab = 'passenger'; loadKPISubTab('passenger')" :class="kpiSubTab === 'passenger' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                    👥 Passenger Revenue
+                </button>
+            </div>
+            
+            <!-- General KPI Sub-tab -->
+            <div x-show="kpiSubTab === 'general'">
+                <div x-show="!dataLoaded" class="text-center py-12 text-gray-500">
+                    <p>Carregue os dados primeiro.</p>
+                </div>
+                <div x-show="dataLoaded">
+                    <!-- KPI Cards -->
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="kpi-detailed-cards"></div>
+                    <!-- KPI Charts Row 1 -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div id="revenue-per-nm-chart" class="h-80"></div>
+                        <div id="revenue-per-seat-chart" class="h-80"></div>
+                    </div>
+                    <!-- Commercial Hours Chart -->
+                    <div class="mb-6">
+                        <div id="commercial-hours-chart" class="h-80"></div>
+                    </div>
+                    <!-- Accumulated Metrics Charts -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                        <div id="accumulated-revenue-chart" class="h-80"></div>
+                        <div id="accumulated-cost-chart" class="h-80"></div>
+                    </div>
+                    <!-- Revenue/Cost per NM Chart -->
+                    <div class="mb-6">
+                        <div id="revenue-cost-per-nm-chart" class="h-80"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Gregorio's KPI Sub-tab -->
+            <div x-show="kpiSubTab === 'gregorio'">
+                <div x-show="!dataLoaded" class="text-center py-12 text-gray-500">
+                    <p>Carregue os dados primeiro.</p>
+                </div>
+                <div x-show="dataLoaded">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6" id="gregorio-kpi-cards"></div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div id="gregorio-kpi-chart-1" class="h-80"></div>
+                        <div id="gregorio-kpi-chart-2" class="h-80"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Passenger Revenue Sub-tab -->
+            <div x-show="kpiSubTab === 'passenger'">
+                <div x-show="!dataLoaded" class="text-center py-12 text-gray-500">
+                    <p>Carregue os dados primeiro.</p>
+                </div>
+                <div x-show="dataLoaded">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" id="passenger-revenue-cards"></div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div id="passenger-revenue-chart-1" class="h-80"></div>
+                        <div id="passenger-revenue-chart-2" class="h-80"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Profit Center Tab -->
+        <div x-show="activeTab === 'profit'" x-cloak>
+            <h2 class="text-2xl font-bold mb-4">💰 Centro de Lucro</h2>
+            <div x-show="dataLoaded">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" id="profit-cards"></div>
+                <div id="profit-chart" class="h-96"></div>
+            </div>
+        </div>
+        
+        <!-- Load Factor Tab -->
+        <div x-show="activeTab === 'load'" x-cloak>
+            <h2 class="text-2xl font-bold mb-4">📊 Load Factor (Ocupação)</h2>
+            <div x-show="dataLoaded">
+                <!-- Category Selector -->
+                <div class="flex gap-2 mb-4">
+                    <button @click="loadFactorCategory = 'all'; loadLoadFactorAnalysis()" :class="loadFactorCategory === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-100'" class="px-3 py-1 rounded text-sm">
+                        Todos
+                    </button>
+                    <button @click="loadFactorCategory = 'shuttle'; loadLoadFactorAnalysis()" :class="loadFactorCategory === 'shuttle' ? 'bg-green-500 text-white' : 'bg-gray-100'" class="px-3 py-1 rounded text-sm">
+                        Shuttle
+                    </button>
+                    <button @click="loadFactorCategory = 'charter'; loadLoadFactorAnalysis()" :class="loadFactorCategory === 'charter' ? 'bg-red-500 text-white' : 'bg-gray-100'" class="px-3 py-1 rounded text-sm">
+                        Charter
+                    </button>
+                </div>
+                
+                <!-- Summary Cards -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="load-factor-cards"></div>
+                
+                <!-- Charts -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                    <div>
+                        <h3 class="font-bold mb-2">Distribuição do Load Factor</h3>
+                        <div id="load-factor-distribution-chart" class="h-80 bg-white rounded-lg"></div>
+                    </div>
+                    <div>
+                        <h3 class="font-bold mb-2">Load Factor por Mês</h3>
+                        <div id="load-factor-monthly-chart" class="h-80 bg-white rounded-lg"></div>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="font-bold mb-2">Load Factor por Aeronave</h3>
+                        <div id="load-factor-aircraft-chart" class="h-64 bg-white rounded-lg"></div>
+                    </div>
+                    <div>
+                        <h3 class="font-bold mb-2">Load Factor por Dia da Semana</h3>
+                        <div id="load-factor-dow-chart" class="h-64 bg-white rounded-lg"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Non-Revenue Tab -->
+        <div x-show="activeTab === 'nonrev'" x-cloak>
+            <h2 class="text-2xl font-bold mb-4">🔄 Voos Não-Receita</h2>
+            <div x-show="dataLoaded">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div id="empty-legs-chart" class="h-80"></div>
+                    <div id="hangar-flights-chart" class="h-80"></div>
+                </div>
+                <div id="nonrev-stats" class="mt-6"></div>
+            </div>
+        </div>
+        
+        <!-- Manifesto Tab -->
+        <div x-show="activeTab === 'manifesto'">
+            <h2 class="text-2xl font-bold mb-4">📋 Manifesto de Passageiros</h2>
+            
+            <!-- Sub-tabs for Manifesto - Always visible -->
+            <div class="flex flex-wrap gap-2 mb-4 border-b pb-2" x-show="activeTab === 'manifesto'">
+                <button @click="manifestoSubTab = 'upload'; loadManifestoSubTab('upload')" :class="manifestoSubTab === 'upload' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                    📁 Upload
+                </button>
+                <button @click="manifestoSubTab = 'overview'; loadManifestoSubTab('overview')" :class="manifestoSubTab === 'overview' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                    📊 Visão Geral
+                </button>
+                <button @click="manifestoSubTab = 'recurring'; loadManifestoSubTab('recurring')" :class="manifestoSubTab === 'recurring' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                    👥 Passageiros Recorrentes
+                </button>
+                <button @click="manifestoSubTab = 'vip'; loadManifestoSubTab('vip')" :class="manifestoSubTab === 'vip' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                    ⭐ VIP
+                </button>
+                <button @click="manifestoSubTab = 'routes'; loadManifestoSubTab('routes')" :class="manifestoSubTab === 'routes' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                    🗺️ Rotas
+                </button>
+                <button @click="manifestoSubTab = 'temporal'; loadManifestoSubTab('temporal')" :class="manifestoSubTab === 'temporal' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                    📅 Temporal
+                </button>
+                <button @click="manifestoSubTab = 'newcustomers'; loadManifestoSubTab('newcustomers')" :class="manifestoSubTab === 'newcustomers' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                    🆕 Novos Clientes
+                </button>
+            </div>
+            
+            <!-- Upload Sub-tab -->
+            <div x-show="manifestoSubTab === 'upload'">
+                <div class="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 mb-6">
+                    <h3 class="font-bold text-lg text-blue-800 mb-4">📋 Consolidação de Manifestos (Importação Incremental)</h3>
+                    
+                    <!-- Step 1: CSV Base Status -->
+                    <div class="bg-white rounded-lg p-4 shadow-sm mb-4">
+                        <h4 class="font-medium mb-3">1️⃣ Arquivo CSV Base (Dados Consolidados)</h4>
+                        <div class="flex items-center gap-4 mb-3">
+                            <div class="flex-1 bg-gray-100 rounded-lg p-3">
+                                <p class="text-sm text-gray-600">Caminho do CSV Base:</p>
+                                <p class="font-mono text-sm" x-text="manifestBasePath || '.cache/manifests_base.csv'"></p>
+                            </div>
+                            <button @click="loadManifestCSV" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 text-sm">
+                                🔄 Carregar CSV
+                            </button>
+                            <button @click="downloadManifestCSV" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
+                                📥 Download CSV
+                            </button>
+                        </div>
+                        
+                        <!-- CSV Status Cards -->
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="manifest-status-cards"></div>
+                    </div>
+                    
+                    <!-- Step 2: Upload New Excel -->
+                    <div class="bg-white rounded-lg p-4 shadow-sm mb-4">
+                        <h4 class="font-medium mb-3">2️⃣ Adicionar Novo Arquivo Excel ao CSV Base</h4>
+                        <form @submit.prevent="uploadManifestFile" class="flex flex-wrap items-center gap-4">
+                            <input type="file" id="manifest-file" accept=".xlsx,.xlsm,.xls" class="flex-1 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                            <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 text-sm">
+                                ✅ Adicionar ao CSV Base
+                            </button>
+                        </form>
+                        <p class="text-xs text-gray-500 mt-2">* Novos registros serão adicionados ao CSV base existente (sem duplicatas)</p>
+                    </div>
+                    
+                    <!-- Step 3: Reset Option -->
+                    <div class="bg-white rounded-lg p-4 shadow-sm mb-4">
+                        <h4 class="font-medium mb-3">3️⃣ Opções Avançadas</h4>
+                        <div class="flex items-center gap-4">
+                            <button @click="resetManifestCSV" class="bg-red-100 text-red-700 px-4 py-2 rounded-lg hover:bg-red-200 text-sm">
+                                🗑️ Limpar CSV e Recomeçar
+                            </button>
+                            <span class="text-xs text-gray-500">Cuidado: Esta ação apagará todos os dados consolidados!</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- CSV Data Table -->
+                <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <div class="flex justify-between items-center p-4 border-b">
+                        <h4 class="font-bold">📄 Dados do CSV Base</h4>
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm text-gray-500" x-text="'Página ' + manifestPage + ' de ' + manifestTotalPages"></span>
+                            <button @click="loadManifestPage(manifestPage - 1)" :disabled="manifestPage <= 1" class="px-3 py-1 bg-gray-100 rounded text-sm disabled:opacity-50">←</button>
+                            <button @click="loadManifestPage(manifestPage + 1)" :disabled="manifestPage >= manifestTotalPages" class="px-3 py-1 bg-gray-100 rounded text-sm disabled:opacity-50">→</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto max-h-96">
+                        <table class="min-w-full text-sm">
+                            <thead class="bg-gray-100 sticky top-0">
+                                <tr>
+                                    <th class="px-3 py-2 text-left">Data</th>
+                                    <th class="px-3 py-2 text-left">Hora</th>
+                                    <th class="px-3 py-2 text-left">Origem</th>
+                                    <th class="px-3 py-2 text-left">Destino</th>
+                                    <th class="px-3 py-2 text-left">Passageiro</th>
+                                    <th class="px-3 py-2 text-left">Aeronave</th>
+                                    <th class="px-3 py-2 text-left">Arquivo</th>
+                                </tr>
+                            </thead>
+                            <tbody id="manifest-csv-table"></tbody>
+                        </table>
+                    </div>
+                    <div class="p-4 border-t text-sm text-gray-500" x-show="manifestTotalRecords > 0">
+                        Total: <span x-text="manifestTotalRecords"></span> registros
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Overview Sub-tab -->
+            <div x-show="manifestoSubTab === 'overview'">
+                <div x-show="!manifestDataLoaded" class="text-center py-12 text-gray-500">
+                    <p>Carregue dados de manifesto primeiro na aba Upload.</p>
+                </div>
+                <div x-show="manifestDataLoaded">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="manifest-overview-cards"></div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h3 class="font-bold mb-2">Top 10 Rotas</h3>
+                            <div id="manifest-routes-chart" class="h-80 bg-white rounded-lg"></div>
+                        </div>
+                        <div>
+                            <h3 class="font-bold mb-2">Passageiros por Mês</h3>
+                            <div id="manifest-monthly-chart" class="h-80 bg-white rounded-lg"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recurring Passengers Sub-tab -->
+            <div x-show="manifestoSubTab === 'recurring'">
+                <div x-show="!manifestDataLoaded" class="text-center py-12 text-gray-500">
+                    <p>Carregue dados de manifesto primeiro.</p>
+                </div>
+                <div x-show="manifestDataLoaded">
+                    <h3 class="font-bold mb-4">👥 Top 20 Passageiros Mais Frequentes</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white rounded-lg shadow-sm">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="px-4 py-2 text-left">#</th>
+                                    <th class="px-4 py-2 text-left">Nome</th>
+                                    <th class="px-4 py-2 text-center">Total Voos</th>
+                                    <th class="px-4 py-2 text-center">Primeiro Voo</th>
+                                    <th class="px-4 py-2 text-center">Último Voo</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recurring-passengers-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- VIP Sub-tab -->
+            <div x-show="manifestoSubTab === 'vip'">
+                <div x-show="!manifestDataLoaded" class="text-center py-12 text-gray-500">
+                    <p>Carregue dados de manifesto primeiro.</p>
+                </div>
+                <div x-show="manifestDataLoaded">
+                    <h3 class="font-bold mb-4">⭐ Passageiros VIP (5+ voos)</h3>
+                    <div id="vip-passengers-chart" class="h-96 bg-white rounded-lg mb-6"></div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white rounded-lg shadow-sm">
+                            <thead class="bg-yellow-100">
+                                <tr>
+                                    <th class="px-4 py-2 text-left">Nome</th>
+                                    <th class="px-4 py-2 text-center">Total Voos</th>
+                                    <th class="px-4 py-2 text-left">Origem Favorita</th>
+                                    <th class="px-4 py-2 text-left">Destino Favorito</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vip-passengers-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Routes Sub-tab -->
+            <div x-show="manifestoSubTab === 'routes'">
+                <div x-show="!manifestDataLoaded" class="text-center py-12 text-gray-500">
+                    <p>Carregue dados de manifesto primeiro.</p>
+                </div>
+                <div x-show="manifestDataLoaded">
+                    <h3 class="font-bold mb-4">🗺️ Análise de Rotas</h3>
+                    <div id="manifest-routes-detail-chart" class="h-96 bg-white rounded-lg mb-6"></div>
+                </div>
+            </div>
+            
+            <!-- Temporal Sub-tab -->
+            <div x-show="manifestoSubTab === 'temporal'">
+                <div x-show="!manifestDataLoaded" class="text-center py-12 text-gray-500">
+                    <p>Carregue dados de manifesto primeiro.</p>
+                </div>
+                <div x-show="manifestDataLoaded">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h3 class="font-bold mb-2">Passageiros por Mês</h3>
+                            <div id="manifest-temporal-monthly-chart" class="h-80 bg-white rounded-lg"></div>
+                        </div>
+                        <div>
+                            <h3 class="font-bold mb-2">Por Dia da Semana</h3>
+                            <div id="manifest-temporal-dow-chart" class="h-80 bg-white rounded-lg"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- New Customers Sub-tab -->
+            <div x-show="manifestoSubTab === 'newcustomers'">
+                <div x-show="!manifestDataLoaded" class="text-center py-12 text-gray-500">
+                    <p>Carregue dados de manifesto primeiro.</p>
+                </div>
+                <div x-show="manifestDataLoaded">
+                    <h3 class="font-bold mb-4">🆕 Novos Clientes por Mês</h3>
+                    <div id="new-customers-chart" class="h-96 bg-white rounded-lg"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Salesforce Tab -->
+        <div x-show="activeTab === 'salesforce'">
+            <h2 class="text-2xl font-bold mb-4">☁️ Salesforce Dashboard</h2>
+            
+            <!-- Sub-tabs for Salesforce - Always visible -->
+            <div class="flex flex-wrap gap-2 mb-4 border-b pb-2" x-show="activeTab === 'salesforce'">
+                <button @click="salesforceSubTab = 'upload'; loadSalesforceSubTab('upload')" :class="salesforceSubTab === 'upload' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                    📁 Upload
+                </button>
+                <button @click="salesforceSubTab = 'summary'; loadSalesforceSubTab('summary')" :class="salesforceSubTab === 'summary' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                    📊 Resumo
+                </button>
+                <button @click="salesforceSubTab = 'monthly'; loadSalesforceSubTab('monthly')" :class="salesforceSubTab === 'monthly' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                    📅 Mensal
+                </button>
+                <button @click="salesforceSubTab = 'routes'; loadSalesforceSubTab('routes')" :class="salesforceSubTab === 'routes' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                    🗺️ Rotas
+                </button>
+                <button @click="salesforceSubTab = 'aircraft'; loadSalesforceSubTab('aircraft')" :class="salesforceSubTab === 'aircraft' ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700'" class="px-3 py-1 rounded text-sm">
+                    ✈️ Aeronaves
+                </button>
+            </div>
+            
+            <!-- Upload Sub-tab -->
+            <div x-show="salesforceSubTab === 'upload'">
+                <div class="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-6 mb-6">
+                    <h3 class="font-bold text-lg text-green-800 mb-4">☁️ Upload de Relatório Salesforce</h3>
+                    
+                    <!-- Upload Section -->
+                    <div class="bg-white rounded-lg p-4 shadow-sm mb-4">
+                        <h4 class="font-medium mb-3">1️⃣ Upload do Relatório HTML do Salesforce</h4>
+                        <form @submit.prevent="uploadSalesforceFile" class="flex items-center gap-4">
+                            <input type="file" id="salesforce-file" accept=".html,.htm,.xls" class="flex-1 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+                            <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
+                                ✅ Processar Salesforce
+                            </button>
+                        </form>
+                        <p class="text-xs text-gray-500 mt-2">Exporte o relatório do Salesforce como HTML ou Excel (.xls salvo como HTML)</p>
+                    </div>
+                    
+                    <!-- ROTAER Upload (Optional) -->
+                    <div class="bg-white rounded-lg p-4 shadow-sm mb-4">
+                        <h4 class="font-medium mb-3">2️⃣ Upload ROTAER (Opcional - para cálculo de distâncias)</h4>
+                        <form @submit.prevent="uploadRotaerFile" class="flex items-center gap-4">
+                            <input type="file" id="rotaer-file" accept=".xlsx,.xls" class="flex-1 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gray-50 file:text-gray-700 hover:file:bg-gray-100">
+                            <button type="submit" class="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 text-sm">
+                                📍 Carregar Coordenadas
+                            </button>
+                        </form>
+                    </div>
+                    
+                    <!-- Status -->
+                    <div x-show="salesforceStatus" class="bg-white rounded-lg p-4 shadow-sm">
+                        <h4 class="font-medium mb-2">Status dos Dados</h4>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="salesforce-status-cards"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Summary Sub-tab -->
+            <div x-show="salesforceSubTab === 'summary'">
+                <div x-show="!salesforceDataLoaded" class="text-center py-12 text-gray-500">
+                    <p>Carregue dados do Salesforce primeiro na aba Upload.</p>
+                </div>
+                <div x-show="salesforceDataLoaded">
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="salesforce-summary-cards"></div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h3 class="font-bold mb-2">Receita por Tipo de Voo</h3>
+                            <div id="salesforce-type-chart" class="h-80 bg-white rounded-lg"></div>
+                        </div>
+                        <div>
+                            <h3 class="font-bold mb-2">Receita Diária</h3>
+                            <div id="salesforce-daily-chart" class="h-80 bg-white rounded-lg"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Monthly Sub-tab -->
+            <div x-show="salesforceSubTab === 'monthly'">
+                <div x-show="!salesforceDataLoaded" class="text-center py-12 text-gray-500">
+                    <p>Carregue dados do Salesforce primeiro.</p>
+                </div>
+                <div x-show="salesforceDataLoaded">
+                    <div id="salesforce-monthly-chart" class="h-96 bg-white rounded-lg mb-6"></div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white rounded-lg shadow-sm">
+                            <thead class="bg-green-100">
+                                <tr>
+                                    <th class="px-4 py-2 text-left">Mês</th>
+                                    <th class="px-4 py-2 text-right">Receita</th>
+                                    <th class="px-4 py-2 text-right">Voos</th>
+                                    <th class="px-4 py-2 text-right">Passageiros</th>
+                                    <th class="px-4 py-2 text-right">R$/NM Médio</th>
+                                </tr>
+                            </thead>
+                            <tbody id="salesforce-monthly-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Routes Sub-tab -->
+            <div x-show="salesforceSubTab === 'routes'">
+                <div x-show="!salesforceDataLoaded" class="text-center py-12 text-gray-500">
+                    <p>Carregue dados do Salesforce primeiro.</p>
+                </div>
+                <div x-show="salesforceDataLoaded">
+                    <h3 class="font-bold mb-4">🗺️ Top Rotas por Receita</h3>
+                    <div id="salesforce-routes-chart" class="h-96 bg-white rounded-lg mb-6"></div>
+                </div>
+            </div>
+            
+            <!-- Aircraft Sub-tab -->
+            <div x-show="salesforceSubTab === 'aircraft'">
+                <div x-show="!salesforceDataLoaded" class="text-center py-12 text-gray-500">
+                    <p>Carregue dados do Salesforce primeiro.</p>
+                </div>
+                <div x-show="salesforceDataLoaded">
+                    <h3 class="font-bold mb-4">✈️ Análise por Aeronave</h3>
+                    <div id="salesforce-aircraft-chart" class="h-80 bg-white rounded-lg mb-6"></div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white rounded-lg shadow-sm">
+                            <thead class="bg-blue-100">
+                                <tr>
+                                    <th class="px-4 py-2 text-left">Prefixo</th>
+                                    <th class="px-4 py-2 text-left">Modelo</th>
+                                    <th class="px-4 py-2 text-right">Receita</th>
+                                    <th class="px-4 py-2 text-right">Voos</th>
+                                    <th class="px-4 py-2 text-right">Passageiros</th>
+                                    <th class="px-4 py-2 text-right">Total NM</th>
+                                </tr>
+                            </thead>
+                            <tbody id="salesforce-aircraft-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Export Tab -->
+        <div x-show="activeTab === 'export'" x-cloak>
+            <h2 class="text-2xl font-bold mb-4">📤 Exportar Dados</h2>
+            <div x-show="dataLoaded" class="space-y-6">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <button @click="exportData('excel')" class="bg-green-600 text-white p-4 rounded-lg hover:bg-green-700">
+                        <div class="text-2xl mb-2">📊</div>
+                        <div class="font-bold">Exportar Excel</div>
+                        <div class="text-sm opacity-80">Dados completos em .xlsx</div>
+                    </button>
+                    <button @click="exportData('csv')" class="bg-blue-600 text-white p-4 rounded-lg hover:bg-blue-700">
+                        <div class="text-2xl mb-2">📄</div>
+                        <div class="font-bold">Exportar CSV</div>
+                        <div class="text-sm opacity-80">Dados em formato CSV</div>
+                    </button>
+                    <button @click="exportData('json')" class="bg-purple-600 text-white p-4 rounded-lg hover:bg-purple-700">
+                        <div class="text-2xl mb-2">{ }</div>
+                        <div class="font-bold">Exportar JSON</div>
+                        <div class="text-sm opacity-80">Dados estruturados em JSON</div>
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Logs Tab -->
+        <div x-show="activeTab === 'logs'" x-cloak>
+            <h2 class="text-2xl font-bold mb-4">📋 Logs</h2>
+            <div class="bg-gray-900 text-green-400 p-4 rounded-lg font-mono text-sm h-96 overflow-y-auto" id="log-container">
+                <template x-for="log in logs" :key="log.timestamp">
+                    <div class="mb-1">
+                        <span class="text-gray-500" x-text="log.timestamp"></span>
+                        <span :class="{'text-red-400': log.level === 'ERROR', 'text-yellow-400': log.level === 'WARNING', 'text-green-400': log.level === 'SUCCESS', 'text-blue-400': log.level === 'INFO'}" x-text="'[' + log.level + ']'"></span>
+                        <span x-text="log.message"></span>
+                    </div>
+                </template>
+            </div>
+            <button @click="clearLogs" class="mt-4 bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700">
+                Limpar Logs
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function dashboardApp() {
+    return {
+        // State
+        activeTab: 'dashboard',
+        showUpload: false,
+        uploading: false,
+        uploadMessage: '',
+        uploadSuccess: false,
+        dataLoaded: false,
+        selectedFile: null,
+        filteredRecords: 0,
+        timeSubTab: 'weekday',
+        seasonalityCategory: 'all',
+        loadFactorCategory: 'all',
+        
+        // KPI state
+        kpiSubTab: 'general',
+        
+        // Manifesto state
+        manifestoSubTab: 'upload',
+        manifestDataLoaded: false,
+        manifestIncremental: true,
+        manifestStatus: false,
+        manifestBasePath: '.cache/manifests_base.csv',
+        manifestPage: 1,
+        manifestTotalPages: 1,
+        manifestTotalRecords: 0,
+        manifestCSVData: [],
+        
+        // Salesforce state
+        salesforceSubTab: 'upload',
+        salesforceDataLoaded: false,
+        salesforceStatus: false,
+        
+        // Tabs configuration
+        tabs: [
+            { id: 'dashboard', name: 'Dashboard', icon: '📊' },
+            { id: 'filters', name: 'Filtros', icon: '🔍' },
+            { id: 'costs', name: 'Custos', icon: '💵' },
+            { id: 'time', name: 'Temporal', icon: '⏰' },
+            { id: 'fleet', name: 'Frota', icon: '✈️' },
+            { id: 'routes', name: 'Rotas', icon: '🗺️' },
+            { id: 'shuttle', name: 'Shuttle', icon: '🚁' },
+            { id: 'kpi', name: 'KPIs', icon: '📈' },
+            { id: 'profit', name: 'Lucro', icon: '💰' },
+            { id: 'load', name: 'Load Factor', icon: '📊' },
+            { id: 'nonrev', name: 'Não-Receita', icon: '🔄' },
+            { id: 'manifesto', name: 'Manifesto', icon: '📋' },
+            { id: 'salesforce', name: 'Salesforce', icon: '☁️' },
+            { id: 'export', name: 'Exportar', icon: '📤' },
+            { id: 'logs', name: 'Logs', icon: '📋' }
+        ],
+        
+        // Filter options (loaded from API)
+        filterOptions: {
+            flight_types: [],
+            aircraft_models: [],
+            aircraft_prefixes: [],
+            months: [],
+            month_names: ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+        },
+        
+        // Costs configuration
+        costs: {
+            EC135: {
+                fixed_cost_per_hour: 0,
+                fuel_cost_per_hour: 0,
+                monthly_fixed_cost: 0,
+                capacity: 5
+            },
+            EC155: {
+                fixed_cost_per_hour: 0,
+                fuel_cost_per_hour: 0,
+                monthly_fixed_cost: 0,
+                capacity: 8
+            }
+        },
+        costSummary: {},
+        
+        // KPI data
+        allKpis: {},
+        
+        // Selected filters
+        selectedFilters: {
+            flight_types: [],
+            aircraft_models: [],
+            months: [1,2,3,4,5,6,7,8,9,10,11,12],
+            revenue_min: null,
+            revenue_max: null,
+            pax_min: null,
+            pax_max: null,
+            include_empty_leg: true,
+            include_hangar_flight: true
+        },
+        
+        // Logs
+        logs: [],
+        
+        // Initialize
+        init() {
+            this.addLog('INFO', 'Dashboard inicializado');
+            this.loadCosts();
+            this.checkDataStatus();
+            
+            // Ensure sub-tabs are initialized
+            this.timeSubTab = 'weekday';
+            this.kpiSubTab = 'general';
+            this.manifestoSubTab = 'upload';
+            this.salesforceSubTab = 'upload';
+            
+            console.log('Sub-tabs initialized:', {
+                timeSubTab: this.timeSubTab,
+                kpiSubTab: this.kpiSubTab,
+                manifestoSubTab: this.manifestoSubTab,
+                salesforceSubTab: this.salesforceSubTab
+            });
+        },
+        
+        addLog(level, message) {
+            const timestamp = new Date().toLocaleTimeString();
+            this.logs.unshift({ timestamp, level, message });
+            if (this.logs.length > 100) this.logs.pop();
+        },
+        
+        clearLogs() {
+            this.logs = [];
+            this.addLog('INFO', 'Logs limpos');
+        },
+        
+        handleFileSelect(event) {
+            this.selectedFile = event.target.files[0];
+        },
+        
+        async uploadFile() {
+            if (!this.selectedFile) {
+                this.uploadMessage = 'Por favor, selecione um arquivo';
+                this.uploadSuccess = false;
+                return;
+            }
+            
+            this.uploading = true;
+            this.uploadMessage = '';
+            this.addLog('INFO', `Iniciando upload: ${this.selectedFile.name}`);
+            
+            const formData = new FormData();
+            formData.append('file', this.selectedFile);
+            
+            try {
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    this.uploadMessage = `✓ ${data.records} registros carregados`;
+                    this.uploadSuccess = true;
+                    this.dataLoaded = true;
+                    this.filteredRecords = data.filtered_records;
+                    this.addLog('SUCCESS', `Upload concluído: ${data.records} registros`);
+                    this.showUpload = false;
+                    await this.loadFilterOptions();
+                    await this.loadDashboard();
+                } else {
+                    this.uploadMessage = data.error || 'Erro ao processar arquivo';
+                    this.uploadSuccess = false;
+                    this.addLog('ERROR', data.error);
+                }
+            } catch (error) {
+                this.uploadMessage = 'Erro: ' + error.message;
+                this.uploadSuccess = false;
+                this.addLog('ERROR', error.message);
+            } finally {
+                this.uploading = false;
+            }
+        },
+        
+        async checkDataStatus() {
+            try {
+                // First check cache status
+                const cacheResponse = await fetch('/api/cache/status');
+                const cacheData = await cacheResponse.json();
+                
+                if (cacheData.exists) {
+                    this.addLog('INFO', 'Cache encontrado, carregando dados...');
+                }
+                
+                // Then check data status (this will auto-load cache if available)
+                const response = await fetch('/api/data/status');
+                const data = await response.json();
+                this.dataLoaded = data.loaded;
+                if (this.dataLoaded) {
+                    this.filteredRecords = data.filtered_records;
+                    this.addLog('SUCCESS', `Dados carregados: ${data.total_records || 0} registros`);
+                    this.showUpload = false; // Hide upload section
+                    await this.loadFilterOptions();
+                    await this.loadDashboard();
+                } else {
+                    // If no data, show upload section
+                    this.showUpload = true;
+                    this.addLog('INFO', 'Nenhum dado carregado. Faça upload de um arquivo para começar.');
+                }
+            } catch (error) {
+                this.addLog('ERROR', 'Erro ao verificar status: ' + error.message);
+                // On error, show upload section
+                this.showUpload = true;
+            }
+        },
+        
+        async loadFilterOptions() {
+            try {
+                const response = await fetch('/api/filters/options');
+                const data = await response.json();
+                if (data.options) {
+                    this.filterOptions = { ...this.filterOptions, ...data.options };
+                    // Initialize selected filters with all options
+                    this.selectedFilters.flight_types = [...this.filterOptions.flight_types];
+                    this.selectedFilters.aircraft_models = [...this.filterOptions.aircraft_models];
+                }
+            } catch (error) {
+                this.addLog('ERROR', 'Erro ao carregar opções de filtro');
+            }
+        },
+        
+        async applyFilters() {
+            this.addLog('INFO', 'Aplicando filtros...');
+            try {
+                const response = await fetch('/api/filters/apply', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ filters: this.selectedFilters })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    this.filteredRecords = data.filtered_records;
+                    this.addLog('SUCCESS', `Filtros aplicados: ${data.filtered_records} registros`);
+                    await this.loadDashboard();
+                }
+            } catch (error) {
+                this.addLog('ERROR', 'Erro ao aplicar filtros: ' + error.message);
+            }
+        },
+        
+        resetFilters() {
+            this.selectedFilters = {
+                flight_types: [...this.filterOptions.flight_types],
+                aircraft_models: [...this.filterOptions.aircraft_models],
+                months: [1,2,3,4,5,6,7,8,9,10,11,12],
+                revenue_min: null,
+                revenue_max: null,
+                pax_min: null,
+                pax_max: null,
+                include_empty_leg: true,
+                include_hangar_flight: true
+            };
+            this.applyFilters();
+        },
+        
+        async loadDashboard() {
+            if (!this.dataLoaded) return;
+            
+            try {
+                // Load summary KPIs
+                const summaryResponse = await fetch('/api/dashboard/summary');
+                const summary = await summaryResponse.json();
+                
+                // Display KPI cards
+                const kpiCards = document.getElementById('kpi-cards');
+                if (kpiCards) {
+                    kpiCards.innerHTML = `
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <h3 class="text-xs font-medium text-gray-600">Total Voos</h3>
+                            <p class="text-2xl font-bold text-blue-600">${summary.total_flights.toLocaleString()}</p>
+                        </div>
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <h3 class="text-xs font-medium text-gray-600">Receita</h3>
+                            <p class="text-2xl font-bold text-green-600">R$ ${(summary.total_revenue/1e6).toFixed(2)}M</p>
+                        </div>
+                        <div class="bg-purple-50 p-4 rounded-lg">
+                            <h3 class="text-xs font-medium text-gray-600">Passageiros</h3>
+                            <p class="text-2xl font-bold text-purple-600">${summary.total_passengers.toLocaleString()}</p>
+                        </div>
+                        <div class="bg-orange-50 p-4 rounded-lg">
+                            <h3 class="text-xs font-medium text-gray-600">Horas Voadas</h3>
+                            <p class="text-2xl font-bold text-orange-600">${summary.total_hours.toFixed(0)}h</p>
+                        </div>
+                        <div class="bg-cyan-50 p-4 rounded-lg">
+                            <h3 class="text-xs font-medium text-gray-600">Receita/Voo</h3>
+                            <p class="text-2xl font-bold text-cyan-600">R$ ${summary.avg_revenue_per_flight.toFixed(0)}</p>
+                        </div>
+                        <div class="bg-pink-50 p-4 rounded-lg">
+                            <h3 class="text-xs font-medium text-gray-600">Pax/Voo</h3>
+                            <p class="text-2xl font-bold text-pink-600">${summary.avg_passengers_per_flight.toFixed(1)}</p>
+                        </div>
+                    `;
+                }
+                
+                // Load charts
+                await this.loadCharts();
+            } catch (error) {
+                this.addLog('ERROR', 'Erro ao carregar dashboard: ' + error.message);
+            }
+        },
+        
+        async loadCharts() {
+            // Monthly revenue chart
+            try {
+                const monthlyResponse = await fetch('/api/charts/monthly-revenue');
+                const monthlyData = await monthlyResponse.json();
+                
+                if (monthlyData.months && monthlyData.months.length > 0) {
+                    Plotly.newPlot('monthly-revenue-chart', [{
+                        x: monthlyData.months,
+                        y: monthlyData.revenue,
+                        type: 'bar',
+                        marker: { color: 'rgb(59, 130, 246)' }
+                    }], {
+                        title: 'Receita Mensal',
+                        xaxis: { title: 'Mês' },
+                        yaxis: { title: 'Receita (R$)' },
+                        margin: { t: 40, b: 40, l: 60, r: 20 }
+                    }, { responsive: true });
+                }
+            } catch (e) { console.error('Error loading monthly chart:', e); }
+            
+            // Flight types chart
+            try {
+                const typesResponse = await fetch('/api/charts/flight-types');
+                const typesData = await typesResponse.json();
+                
+                if (typesData.labels && typesData.labels.length > 0) {
+                    Plotly.newPlot('flight-types-chart', [{
+                        labels: typesData.labels,
+                        values: typesData.values,
+                        type: 'pie',
+                        textposition: 'inside'
+                    }], {
+                        title: 'Distribuição por Tipo',
+                        margin: { t: 40, b: 20, l: 20, r: 20 }
+                    }, { responsive: true });
+                }
+            } catch (e) { console.error('Error loading types chart:', e); }
+            
+            // Category distribution
+            try {
+                const catResponse = await fetch('/api/charts/category-distribution');
+                const catData = await catResponse.json();
+                
+                if (catData.values && catData.values.length > 0) {
+                    Plotly.newPlot('category-distribution-chart', [{
+                        labels: catData.labels,
+                        values: catData.values,
+                        type: 'pie',
+                        marker: { colors: catData.colors }
+                    }], {
+                        title: 'Distribuição por Categoria',
+                        margin: { t: 40, b: 20, l: 20, r: 20 }
+                    }, { responsive: true });
+                }
+            } catch (e) { console.error('Error loading category chart:', e); }
+            
+            // Revenue by category
+            try {
+                const revResponse = await fetch('/api/charts/revenue-by-category');
+                const revData = await revResponse.json();
+                
+                if (revData.categories && revData.categories.length > 0) {
+                    Plotly.newPlot('revenue-by-category-chart', [{
+                        x: revData.categories,
+                        y: revData.revenues,
+                        type: 'bar',
+                        marker: { color: revData.colors }
+                    }], {
+                        title: 'Receita por Categoria',
+                        xaxis: { title: 'Categoria' },
+                        yaxis: { title: 'Receita (R$)' },
+                        margin: { t: 40, b: 60, l: 80, r: 20 }
+                    }, { responsive: true });
+                }
+            } catch (e) { console.error('Error loading revenue chart:', e); }
+        },
+        
+        async loadTabData(tabId) {
+            switch(tabId) {
+                case 'costs':
+                    await this.loadCosts();
+                    if (this.dataLoaded) await this.loadCostSummary();
+                    break;
+                case 'time':
+                    // Carregar primeira sub-aba automaticamente
+                    this.timeSubTab = 'weekday';
+                    if (this.dataLoaded) await this.loadTimeSubTab('weekday');
+                    break;
+                case 'fleet':
+                    if (this.dataLoaded) await this.loadFleetAnalysis();
+                    break;
+                case 'routes':
+                    if (this.dataLoaded) await this.loadRouteAnalysis();
+                    break;
+                case 'kpi':
+                    // Carregar primeira sub-aba automaticamente
+                    this.kpiSubTab = 'general';
+                    if (this.dataLoaded) await this.loadKPISubTab('general');
+                    break;
+                case 'profit':
+                    if (this.dataLoaded) await this.loadProfitAnalysis();
+                    break;
+                case 'load':
+                    if (this.dataLoaded) await this.loadLoadFactorAnalysis();
+                    break;
+                case 'manifesto':
+                    // Carregar primeira sub-aba automaticamente
+                    this.manifestoSubTab = 'upload';
+                    await this.loadManifestoSubTab('upload');
+                    break;
+                case 'salesforce':
+                    // Carregar primeira sub-aba automaticamente
+                    this.salesforceSubTab = 'upload';
+                    await this.loadSalesforceSubTab('upload');
+                    break;
+            }
+        },
+        
+        async loadProfitAnalysis() {
+            try {
+                const response = await fetch('/api/kpis/profitability');
+                const data = await response.json();
+                
+                // Update profit cards
+                const cardsDiv = document.getElementById('profit-cards');
+                if (cardsDiv) {
+                    cardsDiv.innerHTML = `
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <h3 class="text-sm font-medium text-gray-600">Receita Total</h3>
+                            <p class="text-2xl font-bold text-green-600">R$ ${(data.total_revenue || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                        </div>
+                        <div class="bg-red-50 p-4 rounded-lg">
+                            <h3 class="text-sm font-medium text-gray-600">Custo Total</h3>
+                            <p class="text-2xl font-bold text-red-600">R$ ${(data.total_cost || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                        </div>
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <h3 class="text-sm font-medium text-gray-600">Lucro Bruto</h3>
+                            <p class="text-2xl font-bold text-blue-600">R$ ${(data.gross_profit || 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                            <p class="text-sm text-gray-500">Margem: ${(data.profit_margin_percent || 0).toFixed(1)}%</p>
+                        </div>
+                    `;
+                }
+                
+                // Chart
+                const trends = await fetch('/api/kpis/trends').then(r => r.json());
+                if (trends.trends && trends.trends.length > 0) {
+                    Plotly.newPlot('profit-chart', [
+                        { x: trends.trends.map(t => t.month_name), y: trends.trends.map(t => t.revenue), name: 'Receita', type: 'bar', marker: { color: '#10b981' } },
+                        { x: trends.trends.map(t => t.month_name), y: trends.trends.map(t => t.cost), name: 'Custo', type: 'bar', marker: { color: '#ef4444' } },
+                        { x: trends.trends.map(t => t.month_name), y: trends.trends.map(t => t.profit), name: 'Lucro', type: 'scatter', mode: 'lines+markers', marker: { color: '#3b82f6' } }
+                    ], {
+                        title: 'Receita, Custo e Lucro Mensal',
+                        barmode: 'group',
+                        margin: { t: 40, b: 40, l: 80, r: 20 }
+                    }, { responsive: true });
+                }
+            } catch (e) {
+                this.addLog('ERROR', 'Erro ao carregar análise de lucro: ' + e.message);
+            }
+        },
+        
+        async loadTimeAnalysis() {
+            try {
+                const response = await fetch('/api/analysis/weekday-weekend');
+                const data = await response.json();
+                
+                if (data.weekday && data.weekend) {
+                    // Weekday comparison chart
+                    Plotly.newPlot('weekday-comparison-chart', [{
+                        x: ['Dias Úteis', 'Fins de Semana'],
+                        y: [data.weekday.flights, data.weekend.flights],
+                        type: 'bar',
+                        marker: { color: ['#3498db', '#e74c3c'] }
+                    }], {
+                        title: 'Voos: Dias Úteis vs Fim de Semana',
+                        margin: { t: 40, b: 40 }
+                    }, { responsive: true });
+                    
+                    // Revenue comparison
+                    Plotly.newPlot('weekday-revenue-chart', [{
+                        x: ['Dias Úteis', 'Fins de Semana'],
+                        y: [data.weekday.revenue, data.weekend.revenue],
+                        type: 'bar',
+                        marker: { color: ['#2ecc71', '#f39c12'] }
+                    }], {
+                        title: 'Receita: Dias Úteis vs Fim de Semana',
+                        margin: { t: 40, b: 40 }
+                    }, { responsive: true });
+                    
+                    // Stats table
+                    const statsDiv = document.getElementById('weekday-stats');
+                    if (statsDiv) {
+                        statsDiv.innerHTML = `
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="bg-blue-50 p-4 rounded-lg">
+                                    <h3 class="font-bold text-blue-800">Dias Úteis</h3>
+                                    <p>Voos: ${data.weekday.flights.toLocaleString()}</p>
+                                    <p>Receita: R$ ${data.weekday.revenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                                    <p>Passageiros: ${data.weekday.passengers.toLocaleString()}</p>
+                                </div>
+                                <div class="bg-red-50 p-4 rounded-lg">
+                                    <h3 class="font-bold text-red-800">Fins de Semana</h3>
+                                    <p>Voos: ${data.weekend.flights.toLocaleString()}</p>
+                                    <p>Receita: R$ ${data.weekend.revenue.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                                    <p>Passageiros: ${data.weekend.passengers.toLocaleString()}</p>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+            } catch (e) {
+                this.addLog('ERROR', 'Erro ao carregar análise temporal');
+            }
+        },
+        
+        async loadFleetAnalysis() {
+            try {
+                // Aircraft Usage
+                const response = await fetch('/api/charts/aircraft-usage');
+                const data = await response.json();
+                
+                if (data.labels && data.labels.length > 0) {
+                    Plotly.newPlot('aircraft-usage-chart', [{
+                        x: data.labels,
+                        y: data.values,
+                        type: 'bar',
+                        marker: { color: data.labels.map(l => l === 'EC135' ? '#3b82f6' : '#10b981') }
+                    }], {
+                        title: 'Voos por Aeronave',
+                        margin: { t: 40, b: 40, l: 60, r: 20 }
+                    }, { responsive: true });
+                }
+                
+                // Load Idle Analysis
+                await this.loadIdleAnalysis();
+                
+                // Load Aircraft KPIs
+                const kpisResponse = await fetch('/api/kpis/by-aircraft');
+                const kpisData = await kpisResponse.json();
+                
+                if (kpisData && Object.keys(kpisData).length > 0) {
+                    const models = Object.keys(kpisData);
+                    const revenues = models.map(m => kpisData[m].revenue);
+                    
+                    Plotly.newPlot('aircraft-revenue-chart', [{
+                        x: models,
+                        y: revenues,
+                        type: 'bar',
+                        marker: { color: models.map(m => m === 'EC135' ? '#3b82f6' : '#10b981') }
+                    }], {
+                        title: 'Receita por Aeronave',
+                        yaxis: { title: 'Receita (R$)' },
+                        margin: { t: 40, b: 40, l: 80, r: 20 }
+                    }, { responsive: true });
+                }
+            } catch (e) {
+                this.addLog('ERROR', 'Erro ao carregar análise de frota: ' + e.message);
+            }
+        },
+        
+        async loadIdleAnalysis() {
+            try {
+                const response = await fetch('/api/analysis/idle');
+                const data = await response.json();
+                
+                if (data.error) {
+                    console.log('Idle analysis not available:', data.error);
+                    return;
+                }
+                
+                // Update stats cards
+                const statsDiv = document.getElementById('idle-stats');
+                if (statsDiv && data.summary) {
+                    statsDiv.innerHTML = `
+                        <div class="bg-white p-3 rounded-lg shadow-sm">
+                            <p class="text-xs text-gray-600">Aeronaves</p>
+                            <p class="text-xl font-bold text-orange-600">${data.summary.unique_aircraft}</p>
+                        </div>
+                        <div class="bg-white p-3 rounded-lg shadow-sm">
+                            <p class="text-xs text-gray-600">Horas Disponíveis</p>
+                            <p class="text-xl font-bold text-gray-800">${data.summary.total_available_hours?.toLocaleString()}</p>
+                        </div>
+                        <div class="bg-white p-3 rounded-lg shadow-sm">
+                            <p class="text-xs text-gray-600">Horas Voadas</p>
+                            <p class="text-xl font-bold text-green-600">${data.summary.total_flown_hours?.toLocaleString()}</p>
+                        </div>
+                        <div class="bg-white p-3 rounded-lg shadow-sm">
+                            <p class="text-xs text-gray-600">Taxa Utilização</p>
+                            <p class="text-xl font-bold text-blue-600">${data.summary.utilization_rate?.toFixed(1)}%</p>
+                        </div>
+                    `;
+                }
+                
+                // Monthly utilization chart
+                if (data.monthly && data.monthly.length > 0) {
+                    Plotly.newPlot('idle-monthly-chart', [
+                        {
+                            x: data.monthly.map(m => m.month),
+                            y: data.monthly.map(m => m.utilization_rate),
+                            type: 'bar',
+                            name: 'Taxa Utilização (%)',
+                            marker: { color: '#3b82f6' }
+                        }
+                    ], {
+                        title: 'Taxa de Utilização Mensal (%)',
+                        yaxis: { title: 'Utilização (%)', range: [0, 100] },
+                        margin: { t: 40, b: 40, l: 60, r: 20 }
+                    }, { responsive: true });
+                }
+            } catch (e) {
+                console.error('Error loading idle analysis:', e);
+            }
+        },
+        
+        // Time Analysis Sub-tab Loading
+        async loadTimeSubTab(subTab) {
+            switch(subTab) {
+                case 'weekday':
+                    await this.loadTimeAnalysis();
+                    break;
+                case 'monthly':
+                    await this.loadMonthlyTrends();
+                    break;
+                case 'seasonality':
+                    await this.loadSeasonality();
+                    break;
+                case 'hourly':
+                    await this.loadHourlyAnalysis();
+                    break;
+            }
+        },
+        
+        async loadMonthlyTrends() {
+            try {
+                const response = await fetch('/api/kpis/trends');
+                const data = await response.json();
+                
+                if (data.trends && data.trends.length > 0) {
+                    Plotly.newPlot('monthly-trends-chart', [
+                        { x: data.trends.map(t => t.month_name), y: data.trends.map(t => t.flights), name: 'Voos', type: 'bar', marker: { color: '#3b82f6' } },
+                        { x: data.trends.map(t => t.month_name), y: data.trends.map(t => t.revenue / 1000), name: 'Receita (mil)', type: 'scatter', mode: 'lines+markers', yaxis: 'y2', marker: { color: '#10b981' } }
+                    ], {
+                        title: 'Tendência Mensal',
+                        yaxis: { title: 'Voos' },
+                        yaxis2: { title: 'Receita (mil R$)', overlaying: 'y', side: 'right' },
+                        margin: { t: 40, b: 40, l: 60, r: 60 }
+                    }, { responsive: true });
+                }
+            } catch (e) {
+                this.addLog('ERROR', 'Erro ao carregar tendências mensais');
+            }
+        },
+        
+        async loadSeasonality() {
+            try {
+                const response = await fetch(`/api/analysis/seasonality?category=${this.seasonalityCategory}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    this.addLog('WARNING', data.error);
+                    return;
+                }
+                
+                // Daily with moving averages
+                if (data.daily && data.daily.dates.length > 0) {
+                    Plotly.newPlot('seasonality-daily-chart', [
+                        { x: data.daily.dates, y: data.daily.flights, name: 'Diário', type: 'scatter', mode: 'lines', line: { color: '#cbd5e1', width: 1 } },
+                        { x: data.daily.dates, y: data.daily.flights_ma7, name: 'MM 7 dias', type: 'scatter', mode: 'lines', line: { color: '#3b82f6', width: 2 } },
+                        { x: data.daily.dates, y: data.daily.flights_ma30, name: 'MM 30 dias', type: 'scatter', mode: 'lines', line: { color: '#ef4444', width: 2 } }
+                    ], {
+                        title: `Voos Diários - ${this.seasonalityCategory.charAt(0).toUpperCase() + this.seasonalityCategory.slice(1)}`,
+                        yaxis: { title: 'Voos' },
+                        margin: { t: 40, b: 40, l: 60, r: 20 },
+                        legend: { orientation: 'h', y: -0.15 }
+                    }, { responsive: true });
+                }
+                
+                // Day of week pattern
+                if (data.day_of_week && data.day_of_week.length > 0) {
+                    const dowSorted = data.day_of_week.sort((a, b) => a.dow - b.dow);
+                    Plotly.newPlot('seasonality-dow-chart', [{
+                        x: dowSorted.map(d => d.day_name),
+                        y: dowSorted.map(d => d.flights),
+                        type: 'bar',
+                        marker: { color: dowSorted.map(d => d.dow >= 5 ? '#ef4444' : '#3b82f6') }
+                    }], {
+                        title: 'Padrão Semanal',
+                        margin: { t: 40, b: 40, l: 60, r: 20 }
+                    }, { responsive: true });
+                }
+            } catch (e) {
+                this.addLog('ERROR', 'Erro ao carregar sazonalidade: ' + e.message);
+            }
+        },
+        
+        async loadHourlyAnalysis() {
+            try {
+                const response = await fetch('/api/analysis/hours-detailed');
+                const data = await response.json();
+                
+                if (data.error) {
+                    this.addLog('WARNING', data.error);
+                    return;
+                }
+                
+                // Hourly distribution
+                if (data.hourly && data.hourly.length > 0) {
+                    Plotly.newPlot('hourly-distribution-chart', [{
+                        x: data.hourly.map(h => `${h.hour}h`),
+                        y: data.hourly.map(h => h.flights),
+                        type: 'bar',
+                        marker: { color: '#3b82f6' }
+                    }], {
+                        title: 'Distribuição por Hora',
+                        xaxis: { title: 'Hora' },
+                        yaxis: { title: 'Voos' },
+                        margin: { t: 40, b: 40, l: 60, r: 20 }
+                    }, { responsive: true });
+                }
+                
+                // Time of day
+                if (data.time_of_day && data.time_of_day.length > 0) {
+                    Plotly.newPlot('time-of-day-chart', [{
+                        labels: data.time_of_day.map(t => t.period),
+                        values: data.time_of_day.map(t => t.flights),
+                        type: 'pie',
+                        marker: { colors: ['#fbbf24', '#3b82f6', '#8b5cf6', '#6b7280'] }
+                    }], {
+                        title: 'Por Período do Dia',
+                        margin: { t: 40, b: 20, l: 20, r: 20 }
+                    }, { responsive: true });
+                }
+                
+                // Heatmap
+                if (data.heatmap && data.heatmap.length > 0) {
+                    const hours = [...new Set(data.heatmap.map(h => h.Start_Hour))].sort((a, b) => a - b);
+                    const days = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+                    
+                    const z = days.map((_, dayIdx) => 
+                        hours.map(hour => {
+                            const match = data.heatmap.find(h => h.Start_Hour === hour && h.DayOfWeek === dayIdx);
+                            return match ? match.count : 0;
+                        })
+                    );
+                    
+                    Plotly.newPlot('hourly-heatmap', [{
+                        z: z,
+                        x: hours.map(h => `${h}h`),
+                        y: days,
+                        type: 'heatmap',
+                        colorscale: 'Blues'
+                    }], {
+                        title: 'Heatmap: Hora x Dia',
+                        margin: { t: 40, b: 40, l: 60, r: 20 }
+                    }, { responsive: true });
+                }
+            } catch (e) {
+                this.addLog('ERROR', 'Erro ao carregar análise horária: ' + e.message);
+            }
+        },
+        
+        async loadLoadFactorAnalysis() {
+            try {
+                const response = await fetch(`/api/analysis/load-factor-detailed?category=${this.loadFactorCategory}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    this.addLog('WARNING', data.error);
+                    return;
+                }
+                
+                // Cards
+                const cardsDiv = document.getElementById('load-factor-cards');
+                if (cardsDiv) {
+                    cardsDiv.innerHTML = `
+                        <div class="bg-gradient-to-br from-blue-50 to-white p-4 rounded-lg border border-blue-200">
+                            <p class="text-sm text-gray-600">Load Factor Médio</p>
+                            <p class="text-3xl font-bold text-blue-600">${data.overall_load_factor}%</p>
+                        </div>
+                    `;
+                }
+                
+                // Distribution
+                if (data.distribution) {
+                    const labels = Object.keys(data.distribution);
+                    const values = Object.values(data.distribution);
+                    
+                    Plotly.newPlot('load-factor-distribution-chart', [{
+                        x: labels,
+                        y: values,
+                        type: 'bar',
+                        marker: { color: ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#3b82f6'] }
+                    }], {
+                        title: 'Distribuição do Load Factor',
+                        xaxis: { title: 'Faixa' },
+                        yaxis: { title: 'Voos' },
+                        margin: { t: 40, b: 40, l: 60, r: 20 }
+                    }, { responsive: true });
+                }
+                
+                // By Month
+                if (data.by_month && Object.keys(data.by_month).length > 0) {
+                    const months = Object.keys(data.by_month).sort((a, b) => parseInt(a) - parseInt(b));
+                    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                    
+                    Plotly.newPlot('load-factor-monthly-chart', [{
+                        x: months.map(m => monthNames[parseInt(m) - 1]),
+                        y: months.map(m => data.by_month[m]),
+                        type: 'bar',
+                        marker: { color: '#3b82f6' }
+                    }], {
+                        title: 'Load Factor por Mês',
+                        yaxis: { title: 'Load Factor (%)', range: [0, 100] },
+                        margin: { t: 40, b: 40, l: 60, r: 20 }
+                    }, { responsive: true });
+                }
+                
+                // By Aircraft
+                if (data.by_aircraft && Object.keys(data.by_aircraft).length > 0) {
+                    const models = Object.keys(data.by_aircraft);
+                    
+                    Plotly.newPlot('load-factor-aircraft-chart', [{
+                        x: models,
+                        y: models.map(m => data.by_aircraft[m]),
+                        type: 'bar',
+                        marker: { color: models.map(m => m === 'EC135' ? '#3b82f6' : '#10b981') }
+                    }], {
+                        title: 'Load Factor por Aeronave',
+                        yaxis: { range: [0, 100] },
+                        margin: { t: 40, b: 40, l: 60, r: 20 }
+                    }, { responsive: true });
+                }
+                
+                // By Day of Week
+                if (data.by_day_of_week && Object.keys(data.by_day_of_week).length > 0) {
+                    const dayNames = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+                    const days = Object.keys(data.by_day_of_week).sort((a, b) => parseInt(a) - parseInt(b));
+                    
+                    Plotly.newPlot('load-factor-dow-chart', [{
+                        x: days.map(d => dayNames[parseInt(d)]),
+                        y: days.map(d => data.by_day_of_week[d]),
+                        type: 'bar',
+                        marker: { color: days.map(d => parseInt(d) >= 5 ? '#ef4444' : '#3b82f6') }
+                    }], {
+                        title: 'Load Factor por Dia da Semana',
+                        yaxis: { range: [0, 100] },
+                        margin: { t: 40, b: 40, l: 60, r: 20 }
+                    }, { responsive: true });
+                }
+            } catch (e) {
+                this.addLog('ERROR', 'Erro ao carregar análise de load factor: ' + e.message);
+            }
+        },
+        
+        async loadRouteAnalysis() {
+            try {
+                const response = await fetch('/api/analysis/routes');
+                const data = await response.json();
+                
+                if (data.routes && data.routes.length > 0) {
+                    Plotly.newPlot('top-routes-chart', [{
+                        y: data.routes.map(r => r.route),
+                        x: data.routes.map(r => r.count),
+                        type: 'bar',
+                        orientation: 'h',
+                        marker: { color: '#2ecc71' }
+                    }], {
+                        title: 'Top Rotas',
+                        margin: { t: 40, l: 150, r: 20, b: 40 }
+                    }, { responsive: true });
+                }
+            } catch (e) {
+                this.addLog('ERROR', 'Erro ao carregar análise de rotas');
+            }
+        },
+        
+        async loadKPIDashboard() {
+            try {
+                const response = await fetch('/api/dashboard/category-summary');
+                const data = await response.json();
+                
+                const cardsDiv = document.getElementById('kpi-detailed-cards');
+                if (cardsDiv && data) {
+                    let html = '';
+                    for (const [category, stats] of Object.entries(data)) {
+                        html += `
+                            <div class="border rounded-lg p-4">
+                                <h3 class="font-bold text-sm text-gray-600">${category}</h3>
+                                <p class="text-xl font-bold">${stats.flights} voos</p>
+                                <p class="text-sm text-gray-500">R$ ${(stats.revenue/1000).toFixed(0)}k receita</p>
+                                <p class="text-sm text-gray-500">${stats.avg_load_factor.toFixed(1)}% load factor</p>
+                            </div>
+                        `;
+                    }
+                    cardsDiv.innerHTML = html;
+                }
+            } catch (e) {
+                this.addLog('ERROR', 'Erro ao carregar KPIs');
+            }
+        },
+        
+        async exportData(format) {
+            this.addLog('INFO', `Exportando dados em formato ${format}...`);
+            try {
+                const response = await fetch(`/api/export/${format}`);
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `flight_data.${format === 'excel' ? 'xlsx' : format}`;
+                    a.click();
+                    this.addLog('SUCCESS', 'Exportação concluída');
+                } else {
+                    this.addLog('ERROR', 'Erro na exportação');
+                }
+            } catch (e) {
+                this.addLog('ERROR', 'Erro: ' + e.message);
+            }
+        },
+        
+        // ============================================================
+        // COSTS METHODS
+        // ============================================================
+        
+        async loadCosts() {
+            try {
+                const response = await fetch('/api/costs');
+                const data = await response.json();
+                if (data.costs) {
+                    this.costs = { ...this.costs, ...data.costs };
+                    this.addLog('INFO', 'Custos carregados');
+                }
+            } catch (e) {
+                this.addLog('ERROR', 'Erro ao carregar custos: ' + e.message);
+            }
+        },
+        
+        async saveCosts() {
+            this.addLog('INFO', 'Salvando custos...');
+            try {
+                const response = await fetch('/api/costs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ costs: this.costs })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    this.addLog('SUCCESS', 'Custos salvos com sucesso');
+                    // Load cost summary
+                    await this.loadCostSummary();
+                    // Reload dashboard to show updated profit calculations
+                    if (this.dataLoaded) {
+                        await this.loadDashboard();
+                        await this.loadKPIs();
+                    }
+                } else {
+                    this.addLog('ERROR', 'Erro ao salvar custos: ' + (data.error || 'Erro desconhecido'));
+                }
+            } catch (e) {
+                this.addLog('ERROR', 'Erro: ' + e.message);
+            }
+        },
+        
+        async loadCostSummary() {
+            if (!this.dataLoaded) return;
+            try {
+                const response = await fetch('/api/costs/summary');
+                const data = await response.json();
+                this.costSummary = data;
+            } catch (e) {
+                this.addLog('ERROR', 'Erro ao carregar resumo de custos');
+            }
+        },
+        
+        // ============================================================
+        // KPI METHODS
+        // ============================================================
+        
+        async loadKPIs() {
+            if (!this.dataLoaded) return;
+            try {
+                const response = await fetch('/api/kpis/all');
+                const data = await response.json();
+                this.allKpis = data;
+                this.addLog('INFO', 'KPIs carregados');
+            } catch (e) {
+                this.addLog('ERROR', 'Erro ao carregar KPIs: ' + e.message);
+            }
+        },
+        
+        async loadKPISubTab(subTab) {
+            switch(subTab) {
+                case 'general':
+                    await this.loadKPIDashboard();
+                    break;
+                case 'gregorio':
+                    await this.loadGregorioKPIs();
+                    break;
+                case 'passenger':
+                    await this.loadPassengerRevenue();
+                    break;
+            }
+        },
+        
+        async loadKPIDashboard() {
+            if (!this.dataLoaded) return;
+            
+            try {
+                // Load all KPIs
+                await this.loadKPIs();
+                
+                // Load KPI cards
+                const cardsResponse = await fetch('/api/kpis/cards');
+                const cardsData = await cardsResponse.json();
+                
+                // Render KPI cards
+                const cardsDiv = document.getElementById('kpi-detailed-cards');
+                if (cardsDiv && cardsData.cards) {
+                    let html = '';
+                    cardsData.cards.forEach(card => {
+                        html += `
+                            <div class="bg-gradient-to-br from-${card.color}-50 to-white border border-${card.color}-200 rounded-lg p-4">
+                                <div class="text-2xl mb-2">${card.icon}</div>
+                                <h3 class="text-sm font-medium text-gray-600">${card.title}</h3>
+                                <p class="text-2xl font-bold text-${card.color}-600">${card.value}</p>
+                                <p class="text-xs text-gray-500 mt-1">${card.subtitle}</p>
+                            </div>
+                        `;
+                    });
+                    cardsDiv.innerHTML = html;
+                }
+                
+                // Load category KPIs
+                const categoryResponse = await fetch('/api/kpis/by-category');
+                const categoryData = await categoryResponse.json();
+                
+                // Render category comparison chart
+                if (categoryData && Object.keys(categoryData).length > 0) {
+                    const categories = Object.keys(categoryData);
+                    const revenues = categories.map(c => categoryData[c].revenue);
+                    const costs = categories.map(c => categoryData[c].cost || 0);
+                    const profits = categories.map(c => categoryData[c].profit || categoryData[c].revenue);
+                    
+                    Plotly.newPlot('revenue-per-nm-chart', [
+                        { x: categories, y: revenues, name: 'Receita', type: 'bar', marker: { color: '#3b82f6' } },
+                        { x: categories, y: costs, name: 'Custo', type: 'bar', marker: { color: '#ef4444' } },
+                        { x: categories, y: profits, name: 'Lucro', type: 'bar', marker: { color: '#10b981' } }
+                    ], {
+                        title: 'Receita, Custo e Lucro por Categoria',
+                        barmode: 'group',
+                        margin: { t: 40, b: 60, l: 80, r: 20 }
+                    }, { responsive: true });
+                }
+                
+                // Load aircraft KPIs
+                const aircraftResponse = await fetch('/api/kpis/by-aircraft');
+                const aircraftData = await aircraftResponse.json();
+                
+                if (aircraftData && Object.keys(aircraftData).length > 0) {
+                    const models = Object.keys(aircraftData);
+                    const margins = models.map(m => aircraftData[m].margin_percent);
+                    
+                    Plotly.newPlot('revenue-per-seat-chart', [{
+                        x: models,
+                        y: margins,
+                        type: 'bar',
+                        marker: { color: models.map(m => m === 'EC135' ? '#3b82f6' : '#10b981') }
+                    }], {
+                        title: 'Margem de Lucro por Aeronave (%)',
+                        yaxis: { title: 'Margem (%)' },
+                        margin: { t: 40, b: 40, l: 60, r: 20 }
+                    }, { responsive: true });
+                }
+                
+                // Debug: Check classification
+                try {
+                    const debugResponse = await fetch('/api/kpis/debug-classification');
+                    const debugData = await debugResponse.json();
+                    console.log('Debug Classification:', debugData);
+                    this.addLog('INFO', `Debug: ${debugData.counts.total_rows} rows, ${debugData.counts.commercial_count} commercial, ${debugData.counts.shuttle_count} shuttle, ${debugData.counts.charter_count} charter`);
+                } catch (e) {
+                    console.error('Debug error:', e);
+                }
+                
+                // Load commercial hours
+                try {
+                    const commercialHoursResponse = await fetch('/api/kpis/commercial-hours');
+                    if (!commercialHoursResponse.ok) {
+                        throw new Error(`HTTP ${commercialHoursResponse.status}: ${commercialHoursResponse.statusText}`);
+                    }
+                    const commercialHoursData = await commercialHoursResponse.json();
+                    
+                    console.log('Commercial Hours Data:', commercialHoursData);
+                    
+                    if (commercialHoursData.error) {
+                        this.addLog('WARNING', 'Erro ao carregar horas comerciais: ' + commercialHoursData.error);
+                    } else if (commercialHoursData.by_month && commercialHoursData.by_month.length > 0) {
+                        const months = commercialHoursData.by_month.map(m => m.month_name);
+                        const commercialHours = commercialHoursData.by_month.map(m => m.commercial_hours);
+                        const nonCommercialHours = commercialHoursData.by_month.map(m => m.non_commercial_hours);
+                        
+                        // Create traces for overall
+                        const traces = [
+                            { x: months, y: commercialHours, name: 'Horas Comerciais', type: 'bar', marker: { color: '#10b981' } },
+                            { x: months, y: nonCommercialHours, name: 'Horas Não Comerciais', type: 'bar', marker: { color: '#ef4444' } }
+                        ];
+                        
+                        // Add Shuttle and Charter breakdown if available
+                        if (commercialHoursData.by_category) {
+                            if (commercialHoursData.by_category.Shuttle) {
+                                const shuttleMonths = Object.keys(commercialHoursData.by_category.Shuttle);
+                                const shuttleCommercial = shuttleMonths.map(m => commercialHoursData.by_category.Shuttle[m].commercial);
+                                const shuttleNonCommercial = shuttleMonths.map(m => commercialHoursData.by_category.Shuttle[m].non_commercial);
+                                traces.push(
+                                    { x: shuttleMonths, y: shuttleCommercial, name: 'Shuttle - Comercial', type: 'bar', marker: { color: '#3b82f6' }, visible: 'legendonly' },
+                                    { x: shuttleMonths, y: shuttleNonCommercial, name: 'Shuttle - Não Comercial', type: 'bar', marker: { color: '#f59e0b' }, visible: 'legendonly' }
+                                );
+                            }
+                            if (commercialHoursData.by_category.Charter) {
+                                const charterMonths = Object.keys(commercialHoursData.by_category.Charter);
+                                const charterCommercial = charterMonths.map(m => commercialHoursData.by_category.Charter[m].commercial);
+                                const charterNonCommercial = charterMonths.map(m => commercialHoursData.by_category.Charter[m].non_commercial);
+                                traces.push(
+                                    { x: charterMonths, y: charterCommercial, name: 'Charter - Comercial', type: 'bar', marker: { color: '#8b5cf6' }, visible: 'legendonly' },
+                                    { x: charterMonths, y: charterNonCommercial, name: 'Charter - Não Comercial', type: 'bar', marker: { color: '#ec4899' }, visible: 'legendonly' }
+                                );
+                            }
+                        }
+                        
+                        Plotly.newPlot('commercial-hours-chart', traces, {
+                            title: 'Horas Comerciais vs Não Comerciais por Mês',
+                            xaxis: { title: 'Mês' },
+                            yaxis: { title: 'Horas' },
+                            barmode: 'group',
+                            margin: { t: 40, b: 40, l: 60, r: 20 }
+                        }, { responsive: true });
+                    } else {
+                        this.addLog('WARNING', 'Nenhum dado de horas comerciais encontrado. Verifique se os dados foram carregados corretamente.');
+                        document.getElementById('commercial-hours-chart').innerHTML = '<div class="text-center text-gray-500 p-8">Nenhum dado disponível. Faça upload dos dados novamente.</div>';
+                    }
+                } catch (e) {
+                    this.addLog('ERROR', 'Erro ao carregar horas comerciais: ' + e.message);
+                    console.error('Commercial hours error:', e);
+                }
+                
+                // Load accumulated metrics
+                try {
+                    const accumulatedResponse = await fetch('/api/kpis/accumulated');
+                    if (!accumulatedResponse.ok) {
+                        throw new Error(`HTTP ${accumulatedResponse.status}: ${accumulatedResponse.statusText}`);
+                    }
+                    const accumulatedData = await accumulatedResponse.json();
+                    
+                    console.log('Accumulated Data:', accumulatedData);
+                    
+                    if (accumulatedData.error) {
+                        this.addLog('WARNING', 'Erro ao carregar métricas acumuladas: ' + accumulatedData.error);
+                    } else if (accumulatedData.by_flight_type && Object.keys(accumulatedData.by_flight_type).length > 0) {
+                        const flightTypes = Object.keys(accumulatedData.by_flight_type);
+                        const colors = {'Shuttle': '#3b82f6', 'Charter': '#10b981'};
+                        
+                        // Revenue accumulated chart
+                        const revenueTraces = flightTypes.map((type) => ({
+                            x: accumulatedData.by_flight_type[type].months,
+                            y: accumulatedData.by_flight_type[type].revenue_cumulative,
+                            name: type,
+                            type: 'scatter',
+                            mode: 'lines+markers',
+                            marker: { color: colors[type] || '#f59e0b' }
+                        }));
+                        
+                        if (revenueTraces.length > 0) {
+                            Plotly.newPlot('accumulated-revenue-chart', revenueTraces, {
+                                title: 'Receita Acumulada por Tipo de Voo',
+                                xaxis: { title: 'Mês' },
+                                yaxis: { title: 'Receita Acumulada (R$)' },
+                                margin: { t: 40, b: 40, l: 80, r: 20 }
+                            }, { responsive: true });
+                        }
+                        
+                        // Cost accumulated chart
+                        const costTraces = flightTypes.map((type) => ({
+                            x: accumulatedData.by_flight_type[type].months,
+                            y: accumulatedData.by_flight_type[type].cost_cumulative,
+                            name: type,
+                            type: 'scatter',
+                            mode: 'lines+markers',
+                            marker: { color: colors[type] || '#f59e0b' }
+                        }));
+                        
+                        if (costTraces.length > 0) {
+                            Plotly.newPlot('accumulated-cost-chart', costTraces, {
+                                title: 'Custo Acumulado por Tipo de Voo',
+                                xaxis: { title: 'Mês' },
+                                yaxis: { title: 'Custo Acumulado (R$)' },
+                                margin: { t: 40, b: 40, l: 80, r: 20 }
+                            }, { responsive: true });
+                        }
+                    } else {
+                        this.addLog('WARNING', 'Nenhum dado acumulado encontrado. Verifique se há dados de Shuttle ou Charter.');
+                        document.getElementById('accumulated-revenue-chart').innerHTML = '<div class="text-center text-gray-500 p-8">Nenhum dado disponível.</div>';
+                        document.getElementById('accumulated-cost-chart').innerHTML = '<div class="text-center text-gray-500 p-8">Nenhum dado disponível.</div>';
+                    }
+                } catch (e) {
+                    this.addLog('ERROR', 'Erro ao carregar métricas acumuladas: ' + e.message);
+                    console.error('Accumulated metrics error:', e);
+                }
+                
+                // Load revenue/cost per NM
+                const revenueCostPerNmResponse = await fetch('/api/kpis/revenue-cost-per-nm');
+                const revenueCostPerNmData = await revenueCostPerNmResponse.json();
+                
+                if (revenueCostPerNmData.revenue_per_nm !== undefined) {
+                    Plotly.newPlot('revenue-cost-per-nm-chart', [
+                        { x: ['Receita por MN', 'Custo por MN'], y: [revenueCostPerNmData.revenue_per_nm, revenueCostPerNmData.cost_per_nm], 
+                          type: 'bar', marker: { color: ['#10b981', '#ef4444'] } }
+                    ], {
+                        title: `Receita e Custo por Milha Náutica (Total: ${revenueCostPerNmData.total_nm.toLocaleString()} MN)`,
+                        yaxis: { title: 'Valor por Milha Náutica (R$)' },
+                        margin: { t: 40, b: 40, l: 80, r: 20 }
+                    }, { responsive: true });
+                }
+                
+            } catch (e) {
+                this.addLog('ERROR', 'Erro ao carregar KPIs: ' + e.message);
+            }
+        },
+        
+        async loadGregorioKPIs() {
+            if (!this.dataLoaded) return;
+            
+            try {
+                const response = await fetch('/api/kpis/all');
+                const data = await response.json();
+                
+                if (data.error) {
+                    this.addLog('WARNING', data.error);
+                    return;
+                }
+                
+                // Gregorio's specific KPIs
+                const gregorioKPIs = {
+                    'Revenue per Flight Hour': data.revenue?.revenue_per_flight_hour || 0,
+                    'Revenue per Passenger': data.revenue?.revenue_per_passenger || 0,
+                    'Revenue per Seat': data.revenue?.revenue_per_seat_offered || 0,
+                    'Revenue per NM': data.revenue?.revenue_per_nautical_mile || 0,
+                    'Load Factor': data.efficiency?.average_load_factor || 0,
+                    'Utilization Rate': data.utilization?.avg_daily_hours || 0
+                };
+                
+                // Render cards
+                const cardsDiv = document.getElementById('gregorio-kpi-cards');
+                if (cardsDiv) {
+                    let html = '';
+                    Object.entries(gregorioKPIs).forEach(([key, value]) => {
+                        html += `
+                            <div class="bg-gradient-to-br from-purple-50 to-white border border-purple-200 rounded-lg p-4">
+                                <h3 class="text-sm font-medium text-gray-600">${key}</h3>
+                                <p class="text-2xl font-bold text-purple-600">${typeof value === 'number' ? value.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : value}</p>
+                            </div>
+                        `;
+                    });
+                    cardsDiv.innerHTML = html;
+                }
+                
+                // Charts
+                if (data.monthly_trends && data.monthly_trends.length > 0) {
+                    Plotly.newPlot('gregorio-kpi-chart-1', [{
+                        x: data.monthly_trends.map(t => t.month_name),
+                        y: data.monthly_trends.map(t => t.revenue),
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        name: 'Receita Mensal',
+                        marker: { color: '#8b5cf6' }
+                    }], {
+                        title: 'Tendência de Receita - Gregorio',
+                        yaxis: { title: 'Receita (R$)' },
+                        margin: { t: 40, b: 40, l: 60, r: 20 }
+                    }, { responsive: true });
+                }
+                
+                if (data.by_aircraft && Object.keys(data.by_aircraft).length > 0) {
+                    const models = Object.keys(data.by_aircraft);
+                    const revenues = models.map(m => data.by_aircraft[m].revenue);
+                    
+                    Plotly.newPlot('gregorio-kpi-chart-2', [{
+                        x: models,
+                        y: revenues,
+                        type: 'bar',
+                        marker: { color: '#a78bfa' }
+                    }], {
+                        title: 'Receita por Aeronave',
+                        yaxis: { title: 'Receita (R$)' },
+                        margin: { t: 40, b: 40, l: 60, r: 20 }
+                    }, { responsive: true });
+                }
+            } catch (e) {
+                this.addLog('ERROR', 'Erro ao carregar Gregorio KPIs: ' + e.message);
+            }
+        },
+        
+        async loadPassengerRevenue() {
+            if (!this.dataLoaded) return;
+            
+            try {
+                const response = await fetch('/api/kpis/all');
+                const data = await response.json();
+                
+                if (data.error) {
+                    this.addLog('WARNING', data.error);
+                    return;
+                }
+                
+                // Passenger Revenue KPIs
+                const passengerKPIs = {
+                    'Total Passengers': data.overview?.total_passengers || 0,
+                    'Avg Passengers/Flight': data.overview?.avg_passengers_per_flight || 0,
+                    'Revenue per Passenger': data.revenue?.revenue_per_passenger || 0,
+                    'Avg Ticket Price': data.revenue?.avg_ticket_price || 0,
+                    'Load Factor': data.efficiency?.average_load_factor || 0,
+                    'Empty Seats': data.efficiency?.empty_seats || 0
+                };
+                
+                // Render cards
+                const cardsDiv = document.getElementById('passenger-revenue-cards');
+                if (cardsDiv) {
+                    let html = '';
+                    Object.entries(passengerKPIs).forEach(([key, value]) => {
+                        html += `
+                            <div class="bg-gradient-to-br from-green-50 to-white border border-green-200 rounded-lg p-4">
+                                <h3 class="text-sm font-medium text-gray-600">${key}</h3>
+                                <p class="text-2xl font-bold text-green-600">${typeof value === 'number' ? value.toLocaleString('pt-BR', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : value}</p>
+                            </div>
+                        `;
+                    });
+                    cardsDiv.innerHTML = html;
+                }
+                
+                // Charts
+                if (data.monthly_trends && data.monthly_trends.length > 0) {
+                    Plotly.newPlot('passenger-revenue-chart-1', [{
+                        x: data.monthly_trends.map(t => t.month_name),
+                        y: data.monthly_trends.map(t => t.passengers),
+                        type: 'bar',
+                        name: 'Passageiros',
+                        marker: { color: '#10b981' }
+                    }], {
+                        title: 'Passageiros por Mês',
+                        yaxis: { title: 'Passageiros' },
+                        margin: { t: 40, b: 40, l: 60, r: 20 }
+                    }, { responsive: true });
+                }
+                
+                if (data.monthly_trends && data.monthly_trends.length > 0) {
+                    Plotly.newPlot('passenger-revenue-chart-2', [{
+                        x: data.monthly_trends.map(t => t.month_name),
+                        y: data.monthly_trends.map(t => t.revenue / (t.passengers || 1)),
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        name: 'Receita por Passageiro',
+                        marker: { color: '#059669' }
+                    }], {
+                        title: 'Receita Média por Passageiro',
+                        yaxis: { title: 'R$ por Passageiro' },
+                        margin: { t: 40, b: 40, l: 60, r: 20 }
+                    }, { responsive: true });
+                }
+            } catch (e) {
+                this.addLog('ERROR', 'Erro ao carregar Passenger Revenue: ' + e.message);
+            }
+        },
+        
+        // ============================================================
+        // MANIFESTO METHODS
+        // ============================================================
+        
+        async loadManifestoSubTab(subTab) {
+            switch(subTab) {
+                case 'upload':
+                    await this.checkManifestStatus();
+                    break;
+                case 'overview':
+                    await this.loadManifestOverview();
+                    break;
+                case 'recurring':
+                    await this.loadRecurringPassengers();
+                    break;
+                case 'vip':
+                    await this.loadVIPPassengers();
+                    break;
+                case 'routes':
+                    await this.loadManifestRoutes();
+                    break;
+                case 'temporal':
+                    await this.loadManifestTemporal();
+                    break;
+                case 'newcustomers':
+                    await this.loadNewCustomers();
+                    break;
+            }
+        },
+        
+        async checkManifestStatus() {
+            try {
+                const response = await fetch('/api/manifesto/status');
+                const data = await response.json();
+                
+                this.manifestDataLoaded = data.loaded;
+                this.manifestStatus = data.loaded;
+                
+                const cardsDiv = document.getElementById('manifest-status-cards');
+                if (cardsDiv) {
+                    if (data.loaded) {
+                        cardsDiv.innerHTML = `
+                            <div class="bg-green-50 p-3 rounded-lg">
+                                <p class="text-xs text-gray-600">Status</p>
+                                <p class="text-xl font-bold text-green-600">✓ CSV Carregado</p>
+                            </div>
+                            <div class="bg-blue-50 p-3 rounded-lg">
+                                <p class="text-xs text-gray-600">Total Registros</p>
+                                <p class="text-xl font-bold text-blue-600">${data.total_records?.toLocaleString() || 0}</p>
+                            </div>
+                            <div class="bg-purple-50 p-3 rounded-lg">
+                                <p class="text-xs text-gray-600">Passageiros Únicos</p>
+                                <p class="text-xl font-bold text-purple-600">${data.unique_passengers?.toLocaleString() || 0}</p>
+                            </div>
+                            <div class="bg-orange-50 p-3 rounded-lg">
+                                <p class="text-xs text-gray-600">Arquivos Processados</p>
+                                <p class="text-xl font-bold text-orange-600">${data.processed_files || '-'}</p>
+                            </div>
+                        `;
+                    } else {
+                        cardsDiv.innerHTML = `
+                            <div class="bg-yellow-50 p-3 rounded-lg col-span-4">
+                                <p class="text-yellow-800">⚠️ Nenhum dado carregado. Carregue um CSV base ou adicione um novo arquivo Excel.</p>
+                            </div>
+                        `;
+                    }
+                }
+                
+                // Load CSV data table
+                if (data.loaded) {
+                    await this.loadManifestPage(1);
+                }
+            } catch (e) {
+                console.error('Error checking manifest status:', e);
+            }
+        },
+        
+        async loadManifestCSV() {
+            try {
+                this.addLog('INFO', 'Carregando CSV base...');
+                await this.checkManifestStatus();
+                this.addLog('SUCCESS', 'CSV carregado com sucesso');
+            } catch (e) {
+                this.addLog('ERROR', 'Erro ao carregar CSV: ' + e.message);
+            }
+        },
+        
+        async loadManifestPage(page) {
+            if (page < 1) return;
+            
+            try {
+                const response = await fetch(`/api/manifesto/data?page=${page}&per_page=50`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    console.log('No manifest data:', data.error);
+                    return;
+                }
+                
+                this.manifestPage = data.page;
+                this.manifestTotalPages = data.total_pages;
+                this.manifestTotalRecords = data.total;
+                this.manifestCSVData = data.data;
+                
+                // Render table
+                const tbody = document.getElementById('manifest-csv-table');
+                if (tbody && data.data.length > 0) {
+                    tbody.innerHTML = data.data.map((row, i) => `
+                        <tr class="${i % 2 === 0 ? 'bg-gray-50' : ''}">
+                            <td class="px-3 py-2">${row.flight_date || '-'}</td>
+                            <td class="px-3 py-2">${row.time || '-'}</td>
+                            <td class="px-3 py-2">${row.origin || '-'}</td>
+                            <td class="px-3 py-2">${row.destination || '-'}</td>
+                            <td class="px-3 py-2 font-medium">${row.passenger_name || '-'}</td>
+                            <td class="px-3 py-2">${row.aircraft_type || '-'} ${row.registration || ''}</td>
+                            <td class="px-3 py-2 text-xs text-gray-500">${row.source_file || '-'}</td>
+                        </tr>
+                    `).join('');
+                } else if (tbody) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="px-3 py-8 text-center text-gray-500">
+                                Nenhum dado no CSV. Adicione arquivos Excel para começar.
+                            </td>
+                        </tr>
+                    `;
+                }
+            } catch (e) {
+                console.error('Error loading manifest page:', e);
+            }
+        },
+        
+        async downloadManifestCSV() {
+            try {
+                window.location.href = '/api/manifesto/export';
+            } catch (e) {
+                alert('Erro ao baixar CSV: ' + e.message);
+            }
+        },
+        
+        async resetManifestCSV() {
+            if (!confirm('⚠️ Tem certeza que deseja limpar todos os dados do CSV?\n\nEsta ação não pode ser desfeita!')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/manifesto/reset', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    this.addLog('SUCCESS', 'CSV limpo com sucesso');
+                    this.manifestDataLoaded = false;
+                    this.manifestTotalRecords = 0;
+                    await this.checkManifestStatus();
+                    alert('✅ CSV limpo com sucesso!');
+                } else {
+                    alert('Erro: ' + (data.error || 'Falha ao limpar'));
+                }
+            } catch (e) {
+                alert('Erro ao limpar CSV: ' + e.message);
+            }
+        },
+        
+        async uploadManifestFile() {
+            const fileInput = document.getElementById('manifest-file');
+            if (!fileInput.files.length) {
+                alert('Selecione um arquivo Excel de manifesto');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('incremental', this.manifestIncremental ? 'true' : 'false');
+            
+            try {
+                this.addLog('INFO', 'Processando manifesto...');
+                const response = await fetch('/api/manifesto/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    this.addLog('SUCCESS', `Manifesto processado: ${data.new_records} novos registros`);
+                    this.manifestDataLoaded = true;
+                    await this.checkManifestStatus();
+                    alert(`✅ Manifesto processado!\n\nNovos registros: ${data.new_records}\nTotal: ${data.total_records}`);
+                } else {
+                    this.addLog('ERROR', data.error || 'Erro ao processar manifesto');
+                    alert('Erro: ' + (data.error || 'Falha ao processar'));
+                }
+            } catch (e) {
+                this.addLog('ERROR', 'Erro ao fazer upload: ' + e.message);
+                alert('Erro ao fazer upload: ' + e.message);
+            }
+        },
+        
+        async loadManifestOverview() {
+            try {
+                const response = await fetch('/api/manifesto/overview');
+                const data = await response.json();
+                
+                if (data.error) return;
+                
+                // Update cards
+                const cardsDiv = document.getElementById('manifest-overview-cards');
+                if (cardsDiv) {
+                    cardsDiv.innerHTML = `
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600">Total Passageiros</p>
+                            <p class="text-2xl font-bold text-blue-600">${data.total_passengers?.toLocaleString() || 0}</p>
+                        </div>
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600">Passageiros Únicos</p>
+                            <p class="text-2xl font-bold text-green-600">${data.unique_passengers?.toLocaleString() || 0}</p>
+                        </div>
+                        <div class="bg-purple-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600">Total Voos</p>
+                            <p class="text-2xl font-bold text-purple-600">${data.total_flights?.toLocaleString() || 0}</p>
+                        </div>
+                        <div class="bg-orange-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600">Período</p>
+                            <p class="text-lg font-bold text-orange-600">${data.date_range?.start || 'N/A'} a ${data.date_range?.end || 'N/A'}</p>
+                        </div>
+                    `;
+                }
+                
+                // Routes chart
+                if (data.routes && data.routes.length > 0) {
+                    Plotly.newPlot('manifest-routes-chart', [{
+                        x: data.routes.map(r => `${r.origin} → ${r.destination}`).slice(0, 10),
+                        y: data.routes.map(r => r.count).slice(0, 10),
+                        type: 'bar',
+                        marker: { color: '#3b82f6' }
+                    }], {
+                        title: 'Top 10 Rotas',
+                        margin: { t: 40, b: 100, l: 60, r: 20 }
+                    }, { responsive: true });
+                }
+                
+                // Load temporal for monthly chart
+                const temporalResponse = await fetch('/api/manifesto/temporal');
+                const temporalData = await temporalResponse.json();
+                
+                if (temporalData.monthly && temporalData.monthly.length > 0) {
+                    Plotly.newPlot('manifest-monthly-chart', [{
+                        x: temporalData.monthly.map(m => m.month),
+                        y: temporalData.monthly.map(m => m.count),
+                        type: 'bar',
+                        marker: { color: '#10b981' }
+                    }], {
+                        title: 'Passageiros por Mês',
+                        margin: { t: 40, b: 60, l: 60, r: 20 }
+                    }, { responsive: true });
+                }
+            } catch (e) {
+                console.error('Error loading manifest overview:', e);
+            }
+        },
+        
+        async loadRecurringPassengers() {
+            try {
+                const response = await fetch('/api/manifesto/recurring-passengers?top=20');
+                const data = await response.json();
+                
+                if (data.passengers && data.passengers.length > 0) {
+                    const tbody = document.getElementById('recurring-passengers-table');
+                    if (tbody) {
+                        tbody.innerHTML = data.passengers.map((p, i) => `
+                            <tr class="${i % 2 === 0 ? 'bg-gray-50' : ''}">
+                                <td class="px-4 py-2">${i + 1}</td>
+                                <td class="px-4 py-2 font-medium">${p.name}</td>
+                                <td class="px-4 py-2 text-center font-bold text-blue-600">${p.total_flights}</td>
+                                <td class="px-4 py-2 text-center text-sm">${p.first_flight || '-'}</td>
+                                <td class="px-4 py-2 text-center text-sm">${p.last_flight || '-'}</td>
+                            </tr>
+                        `).join('');
+                    }
+                }
+            } catch (e) {
+                console.error('Error loading recurring passengers:', e);
+            }
+        },
+        
+        async loadVIPPassengers() {
+            try {
+                const response = await fetch('/api/manifesto/vip-passengers?min_flights=5');
+                const data = await response.json();
+                
+                if (data.vips && data.vips.length > 0) {
+                    // Chart
+                    Plotly.newPlot('vip-passengers-chart', [{
+                        y: data.vips.slice(0, 15).map(v => v.name),
+                        x: data.vips.slice(0, 15).map(v => v.total_flights),
+                        type: 'bar',
+                        orientation: 'h',
+                        marker: { color: '#f59e0b' }
+                    }], {
+                        title: 'Top 15 VIPs por Número de Voos',
+                        margin: { t: 40, l: 150, r: 20, b: 40 }
+                    }, { responsive: true });
+                    
+                    // Table
+                    const tbody = document.getElementById('vip-passengers-table');
+                    if (tbody) {
+                        tbody.innerHTML = data.vips.map((v, i) => `
+                            <tr class="${i % 2 === 0 ? 'bg-yellow-50' : ''}">
+                                <td class="px-4 py-2 font-medium">⭐ ${v.name}</td>
+                                <td class="px-4 py-2 text-center font-bold text-yellow-600">${v.total_flights}</td>
+                                <td class="px-4 py-2">${v.favorite_origin || '-'}</td>
+                                <td class="px-4 py-2">${v.favorite_destination || '-'}</td>
+                            </tr>
+                        `).join('');
+                    }
+                }
+            } catch (e) {
+                console.error('Error loading VIP passengers:', e);
+            }
+        },
+        
+        async loadManifestRoutes() {
+            try {
+                const response = await fetch('/api/manifesto/routes');
+                const data = await response.json();
+                
+                if (data.routes && data.routes.length > 0) {
+                    Plotly.newPlot('manifest-routes-detail-chart', [{
+                        y: data.routes.map(r => r.route),
+                        x: data.routes.map(r => r.total_passengers),
+                        type: 'bar',
+                        orientation: 'h',
+                        marker: { color: '#8b5cf6' }
+                    }], {
+                        title: `Top 20 Rotas (${data.total_routes} rotas total)`,
+                        margin: { t: 40, l: 200, r: 20, b: 40 },
+                        xaxis: { title: 'Total Passageiros' }
+                    }, { responsive: true });
+                }
+            } catch (e) {
+                console.error('Error loading manifest routes:', e);
+            }
+        },
+        
+        async loadManifestTemporal() {
+            try {
+                const response = await fetch('/api/manifesto/temporal');
+                const data = await response.json();
+                
+                if (data.monthly && data.monthly.length > 0) {
+                    Plotly.newPlot('manifest-temporal-monthly-chart', [{
+                        x: data.monthly.map(m => m.month),
+                        y: data.monthly.map(m => m.count),
+                        type: 'bar',
+                        marker: { color: '#3b82f6' }
+                    }], {
+                        title: 'Passageiros por Mês',
+                        margin: { t: 40, b: 60, l: 60, r: 20 }
+                    }, { responsive: true });
+                }
+                
+                if (data.day_of_week && data.day_of_week.length > 0) {
+                    const sorted = data.day_of_week.sort((a, b) => a.day_of_week - b.day_of_week);
+                    Plotly.newPlot('manifest-temporal-dow-chart', [{
+                        x: sorted.map(d => d.day_name),
+                        y: sorted.map(d => d.count),
+                        type: 'bar',
+                        marker: { color: sorted.map(d => d.day_of_week >= 5 ? '#ef4444' : '#3b82f6') }
+                    }], {
+                        title: 'Passageiros por Dia da Semana',
+                        margin: { t: 40, b: 40, l: 60, r: 20 }
+                    }, { responsive: true });
+                }
+            } catch (e) {
+                console.error('Error loading manifest temporal:', e);
+            }
+        },
+        
+        async loadNewCustomers() {
+            try {
+                const response = await fetch('/api/manifesto/new-customers');
+                const data = await response.json();
+                
+                if (data.data && data.data.length > 0) {
+                    Plotly.newPlot('new-customers-chart', [{
+                        x: data.data.map(d => d.month),
+                        y: data.data.map(d => d.new_customers),
+                        type: 'bar',
+                        marker: { color: '#10b981' }
+                    }], {
+                        title: 'Novos Clientes por Mês',
+                        xaxis: { title: 'Mês' },
+                        yaxis: { title: 'Novos Clientes' },
+                        margin: { t: 40, b: 60, l: 60, r: 20 }
+                    }, { responsive: true });
+                }
+            } catch (e) {
+                console.error('Error loading new customers:', e);
+            }
+        },
+        
+        // ============================================================
+        // SALESFORCE METHODS
+        // ============================================================
+        
+        async loadSalesforceSubTab(subTab) {
+            switch(subTab) {
+                case 'upload':
+                    await this.checkSalesforceStatus();
+                    break;
+                case 'summary':
+                    await this.loadSalesforceSummary();
+                    break;
+                case 'monthly':
+                    await this.loadSalesforceMonthly();
+                    break;
+                case 'routes':
+                    await this.loadSalesforceRoutes();
+                    break;
+                case 'aircraft':
+                    await this.loadSalesforceAircraft();
+                    break;
+            }
+        },
+        
+        async checkSalesforceStatus() {
+            try {
+                const response = await fetch('/api/salesforce/status');
+                const data = await response.json();
+                
+                this.salesforceDataLoaded = data.loaded;
+                this.salesforceStatus = data.loaded;
+                
+                if (data.loaded) {
+                    const cardsDiv = document.getElementById('salesforce-status-cards');
+                    if (cardsDiv) {
+                        cardsDiv.innerHTML = `
+                            <div class="bg-green-50 p-3 rounded-lg">
+                                <p class="text-xs text-gray-600">Status</p>
+                                <p class="text-xl font-bold text-green-600">✓ Carregado</p>
+                            </div>
+                            <div class="bg-blue-50 p-3 rounded-lg">
+                                <p class="text-xs text-gray-600">Total Registros</p>
+                                <p class="text-xl font-bold text-blue-600">${data.total_records?.toLocaleString() || 0}</p>
+                            </div>
+                            <div class="bg-purple-50 p-3 rounded-lg">
+                                <p class="text-xs text-gray-600">Receita Total</p>
+                                <p class="text-xl font-bold text-purple-600">R$ ${(data.total_revenue/1000)?.toFixed(0) || 0}k</p>
+                            </div>
+                        `;
+                    }
+                }
+            } catch (e) {
+                console.error('Error checking salesforce status:', e);
+            }
+        },
+        
+        async uploadSalesforceFile() {
+            const fileInput = document.getElementById('salesforce-file');
+            if (!fileInput.files.length) {
+                alert('Selecione um arquivo HTML do Salesforce');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            try {
+                this.addLog('INFO', 'Processando relatório Salesforce...');
+                const response = await fetch('/api/salesforce/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    this.addLog('SUCCESS', `Salesforce processado: ${data.total_records} registros`);
+                    this.salesforceDataLoaded = true;
+                    await this.checkSalesforceStatus();
+                    alert(`✅ Salesforce processado!\n\nRegistros: ${data.total_records}\nReceita: R$ ${(data.total_revenue/1000).toFixed(0)}k`);
+                } else {
+                    this.addLog('ERROR', data.error || 'Erro ao processar Salesforce');
+                    alert('Erro: ' + (data.error || 'Falha ao processar'));
+                }
+            } catch (e) {
+                this.addLog('ERROR', 'Erro ao fazer upload: ' + e.message);
+                alert('Erro ao fazer upload: ' + e.message);
+            }
+        },
+        
+        async uploadRotaerFile() {
+            const fileInput = document.getElementById('rotaer-file');
+            if (!fileInput.files.length) {
+                alert('Selecione um arquivo Excel ROTAER');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            try {
+                const response = await fetch('/api/salesforce/upload-rotaer', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    this.addLog('SUCCESS', `ROTAER carregado: ${data.coordinates_loaded} coordenadas`);
+                    alert(`✅ ROTAER carregado!\n\n${data.coordinates_loaded} coordenadas`);
+                } else {
+                    alert('Erro: ' + (data.error || 'Falha ao carregar'));
+                }
+            } catch (e) {
+                alert('Erro ao fazer upload: ' + e.message);
+            }
+        },
+        
+        async loadSalesforceSummary() {
+            try {
+                const response = await fetch('/api/salesforce/summary');
+                const data = await response.json();
+                
+                if (data.error) return;
+                
+                // Update cards
+                const cardsDiv = document.getElementById('salesforce-summary-cards');
+                if (cardsDiv) {
+                    cardsDiv.innerHTML = `
+                        <div class="bg-blue-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600">Total Voos</p>
+                            <p class="text-2xl font-bold text-blue-600">${data.total_flights?.toLocaleString() || 0}</p>
+                        </div>
+                        <div class="bg-green-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600">Receita Total</p>
+                            <p class="text-2xl font-bold text-green-600">R$ ${(data.total_revenue/1000)?.toFixed(0) || 0}k</p>
+                        </div>
+                        <div class="bg-purple-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600">Passageiros</p>
+                            <p class="text-2xl font-bold text-purple-600">${data.total_passengers?.toLocaleString() || 0}</p>
+                        </div>
+                        <div class="bg-orange-50 p-4 rounded-lg">
+                            <p class="text-sm text-gray-600">R$/NM Médio</p>
+                            <p class="text-2xl font-bold text-orange-600">R$ ${data.avg_rpnm?.toFixed(2) || 0}</p>
+                        </div>
+                    `;
+                }
+                
+                // Flight types chart
+                const typesResponse = await fetch('/api/salesforce/flight-types');
+                const typesData = await typesResponse.json();
+                
+                if (typesData.data && typesData.data.length > 0) {
+                    Plotly.newPlot('salesforce-type-chart', [{
+                        labels: typesData.data.map(t => t.type),
+                        values: typesData.data.map(t => t.revenue),
+                        type: 'pie',
+                        marker: { colors: ['#3b82f6', '#10b981', '#f59e0b', '#6b7280'] }
+                    }], {
+                        title: 'Receita por Tipo de Voo',
+                        margin: { t: 40, b: 20, l: 20, r: 20 }
+                    }, { responsive: true });
+                }
+                
+                // Daily chart
+                const dailyResponse = await fetch('/api/salesforce/daily');
+                const dailyData = await dailyResponse.json();
+                
+                if (dailyData.dates && dailyData.dates.length > 0) {
+                    Plotly.newPlot('salesforce-daily-chart', [{
+                        x: dailyData.dates,
+                        y: dailyData.revenue,
+                        type: 'scatter',
+                        mode: 'lines+markers',
+                        marker: { color: '#10b981' }
+                    }], {
+                        title: 'Receita Diária',
+                        margin: { t: 40, b: 40, l: 80, r: 20 }
+                    }, { responsive: true });
+                }
+            } catch (e) {
+                console.error('Error loading salesforce summary:', e);
+            }
+        },
+        
+        async loadSalesforceMonthly() {
+            try {
+                const response = await fetch('/api/salesforce/monthly');
+                const data = await response.json();
+                
+                if (data.data && data.data.length > 0) {
+                    // Chart
+                    Plotly.newPlot('salesforce-monthly-chart', [
+                        { x: data.data.map(m => m.month), y: data.data.map(m => m.revenue), name: 'Receita', type: 'bar', marker: { color: '#3b82f6' } },
+                        { x: data.data.map(m => m.month), y: data.data.map(m => m.flights * 1000), name: 'Voos (x1000)', type: 'scatter', mode: 'lines+markers', yaxis: 'y2', marker: { color: '#ef4444' } }
+                    ], {
+                        title: 'Análise Mensal',
+                        yaxis: { title: 'Receita (R$)' },
+                        yaxis2: { title: 'Voos', overlaying: 'y', side: 'right' },
+                        margin: { t: 40, b: 40, l: 80, r: 60 }
+                    }, { responsive: true });
+                    
+                    // Table
+                    const tbody = document.getElementById('salesforce-monthly-table');
+                    if (tbody) {
+                        tbody.innerHTML = data.data.map((m, i) => `
+                            <tr class="${i % 2 === 0 ? 'bg-gray-50' : ''}">
+                                <td class="px-4 py-2 font-medium">${m.month}</td>
+                                <td class="px-4 py-2 text-right">R$ ${m.revenue?.toLocaleString() || 0}</td>
+                                <td class="px-4 py-2 text-right">${m.flights}</td>
+                                <td class="px-4 py-2 text-right">${m.passengers}</td>
+                                <td class="px-4 py-2 text-right">R$ ${m.avg_rpnm?.toFixed(2) || 0}</td>
+                            </tr>
+                        `).join('');
+                    }
+                }
+            } catch (e) {
+                console.error('Error loading salesforce monthly:', e);
+            }
+        },
+        
+        async loadSalesforceRoutes() {
+            try {
+                const response = await fetch('/api/salesforce/routes');
+                const data = await response.json();
+                
+                if (data.data && data.data.length > 0) {
+                    Plotly.newPlot('salesforce-routes-chart', [{
+                        y: data.data.map(r => r.route),
+                        x: data.data.map(r => r.revenue),
+                        type: 'bar',
+                        orientation: 'h',
+                        marker: { color: '#8b5cf6' }
+                    }], {
+                        title: 'Top 20 Rotas por Receita',
+                        margin: { t: 40, l: 200, r: 20, b: 40 },
+                        xaxis: { title: 'Receita (R$)' }
+                    }, { responsive: true });
+                }
+            } catch (e) {
+                console.error('Error loading salesforce routes:', e);
+            }
+        },
+        
+        async loadSalesforceAircraft() {
+            try {
+                const response = await fetch('/api/salesforce/aircraft');
+                const data = await response.json();
+                
+                if (data.data && data.data.length > 0) {
+                    // Chart
+                    Plotly.newPlot('salesforce-aircraft-chart', [{
+                        x: data.data.map(a => `${a.prefix} (${a.model})`),
+                        y: data.data.map(a => a.revenue),
+                        type: 'bar',
+                        marker: { color: data.data.map(a => a.model === 'EC135' ? '#3b82f6' : '#10b981') }
+                    }], {
+                        title: 'Receita por Aeronave',
+                        margin: { t: 40, b: 60, l: 80, r: 20 }
+                    }, { responsive: true });
+                    
+                    // Table
+                    const tbody = document.getElementById('salesforce-aircraft-table');
+                    if (tbody) {
+                        tbody.innerHTML = data.data.map((a, i) => `
+                            <tr class="${i % 2 === 0 ? 'bg-gray-50' : ''}">
+                                <td class="px-4 py-2 font-medium">${a.prefix}</td>
+                                <td class="px-4 py-2">${a.model}</td>
+                                <td class="px-4 py-2 text-right">R$ ${a.revenue?.toLocaleString() || 0}</td>
+                                <td class="px-4 py-2 text-right">${a.flights}</td>
+                                <td class="px-4 py-2 text-right">${a.passengers}</td>
+                                <td class="px-4 py-2 text-right">${a.total_nm?.toFixed(0) || 0}</td>
+                            </tr>
+                        `).join('');
+                    }
+                }
+            } catch (e) {
+                console.error('Error loading salesforce aircraft:', e);
+            }
+        }
+    }
+}
+</script>
+{% endblock %}
