@@ -465,6 +465,15 @@
                     <p>Carregue os dados primeiro.</p>
                 </div>
                 <div x-show="dataLoaded">
+                    <!-- Reclassify Button (if needed) -->
+                    <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <p class="text-sm text-yellow-800 mb-2">
+                            ⚠️ Se os gráficos de horas comerciais/não comerciais não aparecerem, clique no botão abaixo para reclassificar os dados:
+                        </p>
+                        <button @click="reclassifyData()" class="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 text-sm">
+                            🔄 Reclassificar Dados
+                        </button>
+                    </div>
                     <!-- KPI Cards -->
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6" id="kpi-detailed-cards"></div>
                     <!-- KPI Charts Row 1 -->
@@ -1957,6 +1966,24 @@ function dashboardApp() {
                 }
             } catch (e) {
                 this.addLog('ERROR', 'Erro: ' + e.message);
+            }
+        },
+        
+        async reclassifyData() {
+            try {
+                this.addLog('INFO', 'Reclassificando dados...');
+                const response = await fetch('/api/data/reclassify', { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    this.addLog('SUCCESS', `Dados reclassificados: ${data.stats.commercial_count} comerciais, ${data.stats.shuttle_count} shuttle, ${data.stats.charter_count} charter`);
+                    // Reload KPI dashboard
+                    await this.loadKPIDashboard();
+                } else {
+                    this.addLog('ERROR', 'Erro ao reclassificar: ' + (data.error || 'Erro desconhecido'));
+                }
+            } catch (e) {
+                this.addLog('ERROR', 'Erro ao reclassificar dados: ' + e.message);
             }
         },
         

@@ -318,6 +318,47 @@ def apply_filters():
         }), 500
 
 
+@api_bp.route('/data/reclassify', methods=['POST'])
+def reclassify_data():
+    """Reclassify existing data to add Is_Commercial and Flight_Category columns"""
+    processor = get_data_processor()
+    
+    if processor is None:
+        return jsonify({'error': 'Data not loaded'}), 400
+    
+    try:
+        # Reclassify all data
+        if processor.df_all is not None:
+            processor.df_all = processor._classify_flight_type(processor.df_all)
+        if processor.df_filtered is not None:
+            processor.df_filtered = processor._classify_flight_type(processor.df_filtered)
+        
+        # Save to cache
+        from services.cache_service import get_cache_service
+        cache = get_cache_service()
+        cache.save_processor_state(processor)
+        
+        # Count statistics
+        commercial_count = int(processor.df_filtered['Is_Commercial'].sum()) if 'Is_Commercial' in processor.df_filtered.columns else 0
+        shuttle_count = int((processor.df_filtered['Flight_Category'] == 'Shuttle').sum()) if 'Flight_Category' in processor.df_filtered.columns else 0
+        charter_count = int((processor.df_filtered['Flight_Category'] == 'Charter').sum()) if 'Flight_Category' in processor.df_filtered.columns else 0
+        
+        return jsonify({
+            'success': True,
+            'message': 'Dados reclassificados com sucesso',
+            'stats': {
+                'total_records': len(processor.df_filtered),
+                'commercial_count': commercial_count,
+                'non_commercial_count': len(processor.df_filtered) - commercial_count,
+                'shuttle_count': shuttle_count,
+                'charter_count': charter_count
+            }
+        })
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'traceback': traceback.format_exc()}), 500
+
+
 @api_bp.route('/analysis/routes')
 def get_routes_analysis():
     """Get top routes analysis"""

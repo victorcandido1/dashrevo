@@ -1,6 +1,9 @@
 # Script para iniciar o dashboard com ngrok automaticamente
 # Execute: .\start_with_ngrok.ps1
 
+# Token do ngrok (já configurado)
+$ngrokToken = "cr_36hP3CWJgRY79fl3Ywc4LsP0XEd"
+
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Iniciando Dashboard REVO com ngrok" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
@@ -8,6 +11,20 @@ Write-Host ""
 
 # Verificar se ngrok está instalado
 $ngrokPath = Get-Command ngrok -ErrorAction SilentlyContinue
+
+# Se não estiver no PATH, verificar arquivo salvo
+if (-not $ngrokPath) {
+    $ngrokPathFile = Join-Path $PSScriptRoot ".ngrok_path.txt"
+    if (Test-Path $ngrokPathFile) {
+        $savedPath = Get-Content $ngrokPathFile -Raw | ForEach-Object { $_.Trim() }
+        if (Test-Path $savedPath) {
+            $ngrokPath = $savedPath
+            Write-Host "✓ ngrok encontrado em: $savedPath" -ForegroundColor Green
+        }
+    }
+}
+
+# Se ainda não encontrou, pedir ao usuário
 if (-not $ngrokPath) {
     Write-Host "⚠️  ngrok não encontrado!" -ForegroundColor Yellow
     Write-Host ""
@@ -21,6 +38,9 @@ if (-not $ngrokPath) {
     $manualPath = Read-Host "Digite o caminho completo do ngrok.exe (ou Enter para cancelar)"
     if ($manualPath -and (Test-Path $manualPath)) {
         $ngrokPath = $manualPath
+        # Salvar caminho
+        $ngrokPathFile = Join-Path $PSScriptRoot ".ngrok_path.txt"
+        $manualPath | Out-File -FilePath $ngrokPathFile -Encoding UTF8
     } else {
         Write-Host "Cancelado. Iniciando apenas o dashboard..." -ForegroundColor Yellow
         python app.py
@@ -75,6 +95,16 @@ if (-not $dashboardRunning) {
 
 Write-Host "✓ Dashboard iniciado na porta $dashboardPort" -ForegroundColor Green
 Write-Host ""
+
+# Configurar token do ngrok (se necessário)
+Write-Host "Configurando token do ngrok..." -ForegroundColor Cyan
+if ($ngrokPath -is [System.Management.Automation.ApplicationInfo]) {
+    # ngrok está no PATH
+    ngrok config add-authtoken $ngrokToken 2>&1 | Out-Null
+} else {
+    # ngrok está em caminho específico
+    & $ngrokPath config add-authtoken $ngrokToken 2>&1 | Out-Null
+}
 
 # Iniciar ngrok
 Write-Host "Iniciando ngrok..." -ForegroundColor Cyan
