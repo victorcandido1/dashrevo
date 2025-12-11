@@ -102,6 +102,12 @@ class CacheService:
             # Ensure numeric columns are properly typed
             processor._ensure_numeric_columns()
             
+            # Ensure new columns exist (for backward compatibility with old cache)
+            if processor.df_all is not None and 'Is_Commercial' not in processor.df_all.columns:
+                processor.df_all = processor._classify_flight_type(processor.df_all)
+            if processor.df_filtered is not None and 'Is_Commercial' not in processor.df_filtered.columns:
+                processor.df_filtered = processor._classify_flight_type(processor.df_filtered)
+            
             print(f"✓ Cache carregado: {len(processor.df_all) if processor.df_all is not None else 0} registros")
             return processor
             

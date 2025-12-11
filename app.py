@@ -55,7 +55,19 @@ if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     
+    # Get local IP for network access
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+    except:
+        local_ip = "localhost"
+    
     print(f"Running on http://0.0.0.0:{port}")
+    print(f"Local access: http://localhost:{port}")
+    print(f"Network access: http://{local_ip}:{port}")
     print(f"Upload folder: {Config.UPLOAD_FOLDER}")
     print(f"Cache folder: {Config.CACHE_FOLDER}")
     print(f"Debug mode: {debug_mode}")

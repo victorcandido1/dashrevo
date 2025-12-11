@@ -867,21 +867,6 @@ def get_accumulated_metrics():
     return jsonify({'by_flight_type': result})
 
 
-@api_bp.route('/kpis/accumulated')
-def get_accumulated_metrics():
-    """Get accumulated revenue and cost by flight type"""
-    processor = get_data_processor()
-    
-    if processor is None or processor.df_filtered is None:
-        return jsonify({'error': 'Data not loaded'}), 400
-    
-    from services.kpi_calculator import KPICalculator
-    calculator = KPICalculator(processor, get_cost_service())
-    
-    result = calculator._calculate_accumulated_metrics(processor.df_filtered)
-    return jsonify({'by_flight_type': result})
-
-
 @api_bp.route('/kpis/costs-by-category')
 def get_costs_by_category():
     """Get costs detailed by category"""
