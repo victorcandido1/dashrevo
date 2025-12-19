@@ -1,0 +1,26 @@
+﻿{
+  "export_date": "2025-12-19T12:00:30.179306",
+  "export_date_formatted": "19/12/2025 12:00",
+  "total_records": 4568,
+  "date_range": {
+    "start": "2024-01-02",
+    "end": "2025-11-30"
+  },
+  "months_covered": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11
+  ],
+  "total_revenue": 22875457.402037036,
+  "total_flights": 4568,
+  "total_passengers": 5454,
+  "total_hours": 1213.1166666666668
+}
