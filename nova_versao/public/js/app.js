@@ -34,13 +34,16 @@ function publicDashboard() {
             try {
                 this.loading = true;
                 
-                // Load all JSON data files
+                // Cache-busting version (update when data changes)
+                const v = Date.now();
+                
+                // Load all JSON data files with cache-busting
                 const [metadataRes, flightsRes, kpisRes, filtersRes, chartsRes] = await Promise.all([
-                    fetch('data/metadata.json'),
-                    fetch('data/flights.json'),
-                    fetch('data/kpis.json'),
-                    fetch('data/filters.json'),
-                    fetch('data/charts.json')
+                    fetch(`data/metadata.json?v=${v}`),
+                    fetch(`data/flights.json?v=${v}`),
+                    fetch(`data/kpis.json?v=${v}`),
+                    fetch(`data/filters.json?v=${v}`),
+                    fetch(`data/charts.json?v=${v}`)
                 ]);
                 
                 // Check for errors
