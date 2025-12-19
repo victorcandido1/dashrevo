@@ -1,9 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>REVO Flight Analytics - Dashboard Público</title>
+    <!-- v20251219121512 -->
+<title>REVO Flight Analytics - Dashboard PÃºblico</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
@@ -16,8 +17,8 @@
     <header class="bg-gradient-to-r from-blue-900 to-indigo-900 text-white py-4 px-6 shadow-lg">
         <div class="max-w-7xl mx-auto flex items-center justify-between">
             <div class="flex items-center gap-4">
-                <h1 class="text-2xl font-bold">🚁 REVO Flight Analytics</h1>
-                <span class="bg-blue-700 text-xs px-2 py-1 rounded">Versão Pública</span>
+                <h1 class="text-2xl font-bold">ðŸš REVO Flight Analytics</h1>
+                <span class="bg-blue-700 text-xs px-2 py-1 rounded">VersÃ£o PÃºblica</span>
             </div>
             <div class="text-sm text-blue-200">
                 <span x-text="'Atualizado: ' + (metadata?.export_date_formatted || 'Carregando...')"></span>
@@ -29,13 +30,13 @@
     <div class="bg-blue-50 border-b border-blue-200 py-2 px-6" x-show="metadata">
         <div class="max-w-7xl mx-auto flex items-center justify-between text-sm">
             <div class="flex items-center gap-4 text-blue-800">
-                <span>📊 <strong x-text="metadata?.total_records?.toLocaleString()"></strong> voos</span>
-                <span>💰 R$ <strong x-text="(metadata?.total_revenue/1000000).toFixed(1) + 'M'"></strong></span>
-                <span>👥 <strong x-text="metadata?.total_passengers?.toLocaleString()"></strong> passageiros</span>
-                <span>⏱️ <strong x-text="metadata?.total_hours?.toFixed(0)"></strong> horas</span>
+                <span>ðŸ“Š <strong x-text="metadata?.total_records?.toLocaleString()"></strong> voos</span>
+                <span>ðŸ’° R$ <strong x-text="(metadata?.total_revenue/1000000).toFixed(1) + 'M'"></strong></span>
+                <span>ðŸ‘¥ <strong x-text="metadata?.total_passengers?.toLocaleString()"></strong> passageiros</span>
+                <span>â±ï¸ <strong x-text="metadata?.total_hours?.toFixed(0)"></strong> horas</span>
             </div>
             <div class="text-blue-600">
-                Período: <span x-text="metadata?.date_range?.start"></span> a <span x-text="metadata?.date_range?.end"></span>
+                PerÃ­odo: <span x-text="metadata?.date_range?.start"></span> a <span x-text="metadata?.date_range?.end"></span>
             </div>
         </div>
     </div>
@@ -43,13 +44,13 @@
     <main class="max-w-7xl mx-auto py-6 px-4">
         <!-- Loading State -->
         <div x-show="loading" class="text-center py-20">
-            <div class="animate-spin text-4xl mb-4">🔄</div>
+            <div class="animate-spin text-4xl mb-4">ðŸ”„</div>
             <p class="text-gray-600">Carregando dados...</p>
         </div>
         
         <!-- Error State -->
         <div x-show="error" class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-            <div class="text-4xl mb-4">❌</div>
+            <div class="text-4xl mb-4">âŒ</div>
             <p class="text-red-700" x-text="error"></p>
         </div>
         
@@ -74,23 +75,23 @@
             <div class="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-md mb-4 p-3">
                 <div class="flex items-center justify-between flex-wrap gap-3">
                     <div class="flex items-center gap-2 text-white">
-                        <span class="font-semibold text-sm">🎯 Tipo de Voo:</span>
+                        <span class="font-semibold text-sm">ðŸŽ¯ Tipo de Voo:</span>
                     </div>
                     <div class="flex items-center gap-2">
                         <button @click="setCommercialFilter('all')" 
                                 :class="commercialFilter === 'all' ? 'bg-white text-blue-700 shadow-lg' : 'bg-blue-500/30 text-white hover:bg-blue-500/50'"
                                 class="px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200">
-                            📊 Todos os Voos
+                            ðŸ“Š Todos os Voos
                         </button>
                         <button @click="setCommercialFilter('commercial')" 
                                 :class="commercialFilter === 'commercial' ? 'bg-green-500 text-white shadow-lg' : 'bg-blue-500/30 text-white hover:bg-blue-500/50'"
                                 class="px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200">
-                            ✅ Comerciais
+                            âœ… Comerciais
                         </button>
                         <button @click="setCommercialFilter('non_commercial')" 
                                 :class="commercialFilter === 'non_commercial' ? 'bg-orange-500 text-white shadow-lg' : 'bg-blue-500/30 text-white hover:bg-blue-500/50'"
                                 class="px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200">
-                            🔄 Não Comerciais
+                            ðŸ”„ NÃ£o Comerciais
                         </button>
                     </div>
                     <div class="text-white text-sm">
@@ -104,7 +105,7 @@
             <div class="bg-white rounded-lg shadow-md p-6">
                 <!-- Dashboard Tab -->
                 <div x-show="activeTab === 'dashboard'">
-                    <h2 class="text-2xl font-bold mb-4">📊 Dashboard Geral</h2>
+                    <h2 class="text-2xl font-bold mb-4">ðŸ“Š Dashboard Geral</h2>
                     
                     <!-- KPI Cards -->
                     <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
@@ -143,18 +144,18 @@
                 
                 <!-- Temporal Tab -->
                 <div x-show="activeTab === 'time'" x-cloak>
-                    <h2 class="text-2xl font-bold mb-4">⏰ Análise Temporal</h2>
+                    <h2 class="text-2xl font-bold mb-4">â° AnÃ¡lise Temporal</h2>
                     
                     <!-- Sub-tabs -->
                     <div class="flex flex-wrap gap-2 mb-6 border-b pb-2">
                         <button @click="timeSubTab = 'monthly'; loadTimeData()" :class="timeSubTab === 'monthly' ? 'bg-blue-500 text-white' : 'bg-gray-100'" class="px-4 py-2 rounded-lg font-medium text-sm">
-                            📊 Mensal
+                            ðŸ“Š Mensal
                         </button>
                         <button @click="timeSubTab = 'weekday'; loadTimeData()" :class="timeSubTab === 'weekday' ? 'bg-blue-500 text-white' : 'bg-gray-100'" class="px-4 py-2 rounded-lg font-medium text-sm">
-                            📅 Dias da Semana
+                            ðŸ“… Dias da Semana
                         </button>
                         <button @click="timeSubTab = 'hourly'; loadTimeData()" :class="timeSubTab === 'hourly' ? 'bg-blue-500 text-white' : 'bg-gray-100'" class="px-4 py-2 rounded-lg font-medium text-sm">
-                            ⏰ Por Hora
+                            â° Por Hora
                         </button>
                     </div>
                     
@@ -164,7 +165,7 @@
                 
                 <!-- Fleet Tab -->
                 <div x-show="activeTab === 'fleet'" x-cloak>
-                    <h2 class="text-2xl font-bold mb-4">✈️ Análise de Frota</h2>
+                    <h2 class="text-2xl font-bold mb-4">âœˆï¸ AnÃ¡lise de Frota</h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div id="aircraft-usage-chart" class="h-80"></div>
                         <div id="aircraft-revenue-chart" class="h-80"></div>
@@ -174,18 +175,18 @@
                 
                 <!-- Routes Tab -->
                 <div x-show="activeTab === 'routes'" x-cloak>
-                    <h2 class="text-2xl font-bold mb-4">🗺️ Análise de Rotas</h2>
+                    <h2 class="text-2xl font-bold mb-4">ðŸ—ºï¸ AnÃ¡lise de Rotas</h2>
                     <div id="routes-chart" class="h-96 mb-6"></div>
                     <div id="routes-stats" class="mt-4"></div>
                 </div>
                 
                 <!-- KPIs Tab -->
                 <div x-show="activeTab === 'kpi'" x-cloak>
-                    <h2 class="text-2xl font-bold mb-4">📈 KPIs Detalhados</h2>
+                    <h2 class="text-2xl font-bold mb-4">ðŸ“ˆ KPIs Detalhados</h2>
                     
                     <!-- Monthly Trends -->
                     <div class="mb-8">
-                        <h3 class="text-lg font-semibold mb-4">Tendências Mensais</h3>
+                        <h3 class="text-lg font-semibold mb-4">TendÃªncias Mensais</h3>
                         <div id="kpi-monthly-chart" class="h-80"></div>
                     </div>
                     
@@ -199,7 +200,7 @@
     <!-- Footer -->
     <footer class="bg-gray-800 text-white py-4 px-6 mt-8">
         <div class="max-w-7xl mx-auto text-center text-sm">
-            <p>REVO Flight Analytics - Dashboard Público</p>
+            <p>REVO Flight Analytics - Dashboard PÃºblico</p>
             <p class="text-gray-400 mt-1">Dados atualizados em: <span x-text="metadata?.export_date_formatted || '-'"></span></p>
         </div>
     </footer>
@@ -207,4 +208,5 @@
     <script src="js/app.js"></script>
 </body>
 </html>
+
 
