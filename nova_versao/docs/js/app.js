@@ -1,5 +1,4 @@
-﻿// Version: 2025-12-19-12-15-12 - Force cache refresh
-/**
+﻿/**
  * REVO Flight Analytics - Public Dashboard
  * This is a static version that reads from JSON files instead of API
  */
@@ -24,11 +23,11 @@ function publicDashboard() {
         
         // Tabs configuration (subset of admin tabs)
         tabs: [
-            { id: 'dashboard', name: 'Dashboard', icon: 'ðŸ“Š' },
-            { id: 'time', name: 'Temporal', icon: 'â°' },
-            { id: 'fleet', name: 'Frota', icon: 'âœˆï¸' },
-            { id: 'routes', name: 'Rotas', icon: 'ðŸ—ºï¸' },
-            { id: 'kpi', name: 'KPIs', icon: 'ðŸ“ˆ' }
+            { id: 'dashboard', name: 'Dashboard' },
+            { id: 'time', name: 'Temporal' },
+            { id: 'fleet', name: 'Frota' },
+            { id: 'routes', name: 'Rotas' },
+            { id: 'kpi', name: 'KPIs' }
         ],
         
         async init() {
@@ -48,7 +47,7 @@ function publicDashboard() {
                 ]);
                 
                 // Check for errors
-                if (!metadataRes.ok) throw new Error('Dados nÃ£o encontrados. A versÃ£o pÃºblica ainda nÃ£o foi gerada.');
+                if (!metadataRes.ok) throw new Error('Dados nao encontrados. A versao publica ainda nao foi gerada.');
                 
                 this.metadata = await metadataRes.json();
                 this.flights = await flightsRes.json();
@@ -118,7 +117,7 @@ function publicDashboard() {
                 type: 'pie',
                 marker: { colors: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'] }
             }], {
-                title: 'DistribuiÃ§Ã£o por Categoria',
+                title: 'Distribuicao por Categoria',
                 margin: { t: 40, b: 20, l: 20, r: 20 }
             }, { responsive: true });
             
@@ -145,7 +144,7 @@ function publicDashboard() {
                         marker: { color: '#10b981' }
                     }
                 ], {
-                    title: 'TendÃªncia Mensal',
+                    title: 'Tendencia Mensal',
                     yaxis: { title: 'Voos' },
                     yaxis2: { title: 'Receita (mil R$)', overlaying: 'y', side: 'right' },
                     margin: { t: 40, b: 40, l: 60, r: 60 },
@@ -174,7 +173,7 @@ function publicDashboard() {
                     }),
                     textposition: 'outside'
                 }], {
-                    title: 'Voos por MÃªs (horas voadas em cima)',
+                    title: 'Voos por Mes (horas voadas em cima)',
                     yaxis: { title: 'Voos' },
                     margin: { t: 60, b: 40, l: 60, r: 20 }
                 }, { responsive: true });
@@ -187,25 +186,25 @@ function publicDashboard() {
                 document.getElementById('time-stats').innerHTML = `
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div class="bg-gray-100 p-4 rounded-lg">
-                            <h4 class="text-sm font-semibold text-gray-600 mb-2">ðŸ“Š Totais</h4>
+                            <h4 class="text-sm font-semibold text-gray-600 mb-2">Totais</h4>
                             <div class="text-sm">
                                 <div>Voos: <strong>${totalFlights.toLocaleString()}</strong></div>
                                 <div>Horas: <strong>${totalHours.toFixed(0)}h</strong></div>
                             </div>
                         </div>
                         <div class="bg-gray-100 p-4 rounded-lg">
-                            <h4 class="text-sm font-semibold text-gray-600 mb-2">ðŸ’° Receita</h4>
+                            <h4 class="text-sm font-semibold text-gray-600 mb-2">Receita</h4>
                             <div class="text-xl font-bold text-green-600">R$ ${(totalRevenue/1000).toFixed(0)}k</div>
                         </div>
                         <div class="bg-gray-100 p-4 rounded-lg">
-                            <h4 class="text-sm font-semibold text-gray-600 mb-2">ðŸ“ˆ MÃ©dia Mensal</h4>
+                            <h4 class="text-sm font-semibold text-gray-600 mb-2">Media Mensal</h4>
                             <div class="text-sm">
                                 <div>Voos: <strong>${(totalFlights / months.length).toFixed(0)}</strong></div>
                                 <div>Horas: <strong>${(totalHours / months.length).toFixed(0)}h</strong></div>
                             </div>
                         </div>
                         <div class="bg-gray-100 p-4 rounded-lg">
-                            <h4 class="text-sm font-semibold text-gray-600 mb-2">â±ï¸ MÃ©tricas</h4>
+                            <h4 class="text-sm font-semibold text-gray-600 mb-2">Metricas</h4>
                             <div class="text-sm">
                                 <div>Receita/Voo: <strong>R$ ${(totalRevenue / totalFlights).toFixed(0)}</strong></div>
                                 <div>Receita/Hora: <strong>R$ ${(totalRevenue / totalHours).toFixed(0)}</strong></div>
@@ -215,7 +214,7 @@ function publicDashboard() {
                 `;
                 
             } else if (this.timeSubTab === 'weekday') {
-                const days = ['Domingo', 'Segunda', 'TerÃ§a', 'Quarta', 'Quinta', 'Sexta', 'SÃ¡bado'];
+                const days = ['Domingo', 'Segunda', 'Terca', 'Quarta', 'Quinta', 'Sexta', 'Sabado'];
                 const byDay = this.groupBy(df, 'DayOfWeek');
                 
                 Plotly.newPlot('time-chart', [{
@@ -239,7 +238,7 @@ function publicDashboard() {
                     type: 'bar',
                     marker: { color: '#3b82f6' }
                 }], {
-                    title: 'DistribuiÃ§Ã£o por Hora de Decolagem',
+                    title: 'Distribuicao por Hora de Decolagem',
                     xaxis: { title: 'Hora' },
                     yaxis: { title: 'Voos' },
                     margin: { t: 40, b: 40, l: 60, r: 20 }
@@ -285,7 +284,7 @@ function publicDashboard() {
                         const hours = flights.reduce((sum, f) => sum + (f.Flight_Time_Hours || 0), 0);
                         return `
                             <div class="bg-gray-100 p-4 rounded-lg">
-                                <h4 class="text-sm font-semibold text-gray-600 mb-2">âœˆï¸ ${m}</h4>
+                                <h4 class="text-sm font-semibold text-gray-600 mb-2">${m}</h4>
                                 <div class="text-sm space-y-1">
                                     <div>Voos: <strong>${flights.length}</strong></div>
                                     <div>Horas: <strong>${hours.toFixed(0)}h</strong></div>
@@ -325,24 +324,24 @@ function publicDashboard() {
             document.getElementById('routes-stats').innerHTML = `
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div class="bg-gray-100 p-4 rounded-lg">
-                        <h4 class="text-sm font-semibold text-gray-600 mb-2">ðŸ“Š Resumo</h4>
+                        <h4 class="text-sm font-semibold text-gray-600 mb-2">Resumo</h4>
                         <div class="text-sm">
                             <div>Total Rotas: <strong>${totalRoutes}</strong></div>
                             <div>Total Voos: <strong>${df.length.toLocaleString()}</strong></div>
                         </div>
                     </div>
                     <div class="bg-green-50 p-4 rounded-lg">
-                        <h4 class="text-sm font-semibold text-green-600 mb-2">ðŸ† Rota Mais Popular</h4>
+                        <h4 class="text-sm font-semibold text-green-600 mb-2">Rota Mais Popular</h4>
                         <div class="text-lg font-bold text-green-700">${topRoute}</div>
                         <div class="text-sm text-gray-600">${byRoute[topRoute].length} voos</div>
                     </div>
                     <div class="bg-gray-100 p-4 rounded-lg">
-                        <h4 class="text-sm font-semibold text-gray-600 mb-2">ðŸ“ˆ Top 5</h4>
+                        <h4 class="text-sm font-semibold text-gray-600 mb-2">Top 5</h4>
                         <div class="text-xl font-bold text-blue-600">${routes.slice(0, 5).reduce((sum, r) => sum + byRoute[r].length, 0)}</div>
                         <div class="text-sm text-gray-500">voos nas top 5 rotas</div>
                     </div>
                     <div class="bg-gray-100 p-4 rounded-lg">
-                        <h4 class="text-sm font-semibold text-gray-600 mb-2">ðŸ“‹ MÃ©dia</h4>
+                        <h4 class="text-sm font-semibold text-gray-600 mb-2">Media</h4>
                         <div class="text-xl font-bold text-purple-600">${(df.length / totalRoutes).toFixed(1)}</div>
                         <div class="text-sm text-gray-500">voos por rota</div>
                     </div>
@@ -382,7 +381,7 @@ function publicDashboard() {
                         marker: { color: '#ef4444' }
                     }
                 ], {
-                    title: 'TendÃªncias Mensais: Voos, Receita e Custo',
+                    title: 'Tendencias Mensais: Voos, Receita e Custo',
                     yaxis: { title: 'Voos' },
                     yaxis2: { title: 'Valor (mil R$)', overlaying: 'y', side: 'right' },
                     margin: { t: 40, b: 40, l: 60, r: 60 },
@@ -394,7 +393,7 @@ function publicDashboard() {
                     <table class="min-w-full bg-white border border-gray-200 text-sm">
                         <thead class="bg-gray-100">
                             <tr>
-                                <th class="px-4 py-2 border text-left">MÃªs</th>
+                                <th class="px-4 py-2 border text-left">Mes</th>
                                 <th class="px-4 py-2 border text-right">Voos</th>
                                 <th class="px-4 py-2 border text-right">Horas</th>
                                 <th class="px-4 py-2 border text-right">Pax</th>
@@ -439,5 +438,3 @@ function publicDashboard() {
         }
     };
 }
-
-
