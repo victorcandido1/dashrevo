@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>REVO Flight Analytics - Dashboard Público</title>
+    <title>REVO Flight Analytics - Dashboard Publico</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
@@ -17,7 +17,7 @@
         <div class="max-w-7xl mx-auto flex items-center justify-between">
             <div class="flex items-center gap-4">
                 <h1 class="text-2xl font-bold">REVO Flight Analytics</h1>
-                <span class="bg-blue-700 text-xs px-2 py-1 rounded">Versão Pública</span>
+                <span class="bg-blue-700 text-xs px-2 py-1 rounded">Versao Publica</span>
             </div>
             <div class="text-sm text-blue-200">
                 <span x-text="'Atualizado: ' + (metadata?.export_date_formatted || 'Carregando...')"></span>
@@ -35,7 +35,7 @@
                 <span><strong x-text="metadata?.total_hours?.toFixed(0)"></strong> horas</span>
             </div>
             <div class="text-blue-600">
-                Período: <span x-text="metadata?.date_range?.start"></span> a <span x-text="metadata?.date_range?.end"></span>
+                Periodo: <span x-text="metadata?.date_range?.start"></span> a <span x-text="metadata?.date_range?.end"></span>
             </div>
         </div>
     </div>
@@ -90,7 +90,7 @@
                         <button @click="setCommercialFilter('non_commercial')" 
                                 :class="commercialFilter === 'non_commercial' ? 'bg-orange-500 text-white shadow-lg' : 'bg-blue-500/30 text-white hover:bg-blue-500/50'"
                                 class="px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200">
-                            Não Comerciais
+                            Nao Comerciais
                         </button>
                     </div>
                     <div class="text-white text-sm">
@@ -143,7 +143,7 @@
                 
                 <!-- Temporal Tab -->
                 <div x-show="activeTab === 'time'" x-cloak>
-                    <h2 class="text-2xl font-bold mb-4">Análise Temporal</h2>
+                    <h2 class="text-2xl font-bold mb-4">Analise Temporal</h2>
                     
                     <!-- Sub-tabs -->
                     <div class="flex flex-wrap gap-2 mb-6 border-b pb-2">
@@ -164,7 +164,7 @@
                 
                 <!-- Fleet Tab -->
                 <div x-show="activeTab === 'fleet'" x-cloak>
-                    <h2 class="text-2xl font-bold mb-4">Análise de Frota</h2>
+                    <h2 class="text-2xl font-bold mb-4">Analise de Frota</h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div id="aircraft-usage-chart" class="h-80"></div>
                         <div id="aircraft-revenue-chart" class="h-80"></div>
@@ -174,7 +174,7 @@
                 
                 <!-- Routes Tab -->
                 <div x-show="activeTab === 'routes'" x-cloak>
-                    <h2 class="text-2xl font-bold mb-4">Análise de Rotas</h2>
+                    <h2 class="text-2xl font-bold mb-4">Analise de Rotas</h2>
                     <div id="routes-chart" class="h-96 mb-6"></div>
                     <div id="routes-stats" class="mt-4"></div>
                 </div>
@@ -185,7 +185,7 @@
                     
                     <!-- Monthly Trends -->
                     <div class="mb-8">
-                        <h3 class="text-lg font-semibold mb-4">Tendências Mensais</h3>
+                        <h3 class="text-lg font-semibold mb-4">Tendencias Mensais</h3>
                         <div id="kpi-monthly-chart" class="h-80"></div>
                     </div>
                     
@@ -199,7 +199,7 @@
     <!-- Footer -->
     <footer class="bg-gray-800 text-white py-4 px-6 mt-8">
         <div class="max-w-7xl mx-auto text-center text-sm">
-            <p>REVO Flight Analytics - Dashboard Público</p>
+            <p>REVO Flight Analytics - Dashboard Publico</p>
             <p class="text-gray-400 mt-1">Dados atualizados em: <span x-text="metadata?.export_date_formatted || '-'"></span></p>
         </div>
     </footer>
