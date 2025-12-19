@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
@@ -7,106 +7,68 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
-    <style>
-        [x-cloak] { display: none !important; }
-    </style>
+    <style>[x-cloak] { display: none !important; }</style>
 </head>
 <body class="bg-gray-100 min-h-screen" x-data="publicDashboard()" x-init="init()">
-    <!-- Header -->
     <header class="bg-gradient-to-r from-blue-900 to-indigo-900 text-white py-4 px-6 shadow-lg">
         <div class="max-w-7xl mx-auto flex items-center justify-between">
             <div class="flex items-center gap-4">
                 <h1 class="text-2xl font-bold">REVO Flight Analytics</h1>
-                <span class="bg-blue-700 text-xs px-2 py-1 rounded">Versao Publica</span>
+                <span class="bg-blue-700 text-xs px-2 py-1 rounded">Dashboard Publico</span>
             </div>
             <div class="text-sm text-blue-200">
                 <span x-text="'Atualizado: ' + (metadata?.export_date_formatted || 'Carregando...')"></span>
             </div>
         </div>
     </header>
-    
-    <!-- Last Update Banner -->
     <div class="bg-blue-50 border-b border-blue-200 py-2 px-6" x-show="metadata">
         <div class="max-w-7xl mx-auto flex items-center justify-between text-sm">
             <div class="flex items-center gap-4 text-blue-800">
                 <span><strong x-text="metadata?.total_records?.toLocaleString()"></strong> voos</span>
                 <span>R$ <strong x-text="(metadata?.total_revenue/1000000).toFixed(1) + 'M'"></strong></span>
                 <span><strong x-text="metadata?.total_passengers?.toLocaleString()"></strong> passageiros</span>
-                <span><strong x-text="metadata?.total_hours?.toFixed(0)"></strong> horas</span>
             </div>
             <div class="text-blue-600">
                 Periodo: <span x-text="metadata?.date_range?.start"></span> a <span x-text="metadata?.date_range?.end"></span>
             </div>
         </div>
     </div>
-    
     <main class="max-w-7xl mx-auto py-6 px-4">
-        <!-- Loading State -->
         <div x-show="loading" class="text-center py-20">
             <div class="animate-spin text-4xl mb-4">Loading...</div>
             <p class="text-gray-600">Carregando dados...</p>
         </div>
-        
-        <!-- Error State -->
         <div x-show="error" class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-            <div class="text-4xl mb-4">Erro</div>
             <p class="text-red-700" x-text="error"></p>
         </div>
-        
-        <!-- Content -->
         <div x-show="!loading && !error">
-            <!-- Tab Navigation -->
             <div class="bg-white rounded-lg shadow-md mb-6 overflow-x-auto">
                 <div class="border-b border-gray-200">
                     <nav class="flex px-4 min-w-max" aria-label="Tabs">
                         <template x-for="tab in tabs" :key="tab.id">
                             <button @click="activeTab = tab.id; loadTabData(tab.id)" 
-                                    :class="activeTab === tab.id ? 'border-blue-500 text-blue-600 bg-blue-50' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
-                                    class="whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm transition-colors">
+                                    :class="activeTab === tab.id ? 'border-blue-500 text-blue-600 bg-blue-50' : 'border-transparent text-gray-500'"
+                                    class="whitespace-nowrap py-3 px-4 border-b-2 font-medium text-sm">
                                 <span x-text="tab.name"></span>
                             </button>
                         </template>
                     </nav>
                 </div>
             </div>
-            
-            <!-- Commercial Filter Bar -->
             <div class="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-md mb-4 p-3">
                 <div class="flex items-center justify-between flex-wrap gap-3">
-                    <div class="flex items-center gap-2 text-white">
-                        <span class="font-semibold text-sm">Tipo de Voo:</span>
-                    </div>
+                    <span class="font-semibold text-sm text-white">Tipo de Voo:</span>
                     <div class="flex items-center gap-2">
-                        <button @click="setCommercialFilter('all')" 
-                                :class="commercialFilter === 'all' ? 'bg-white text-blue-700 shadow-lg' : 'bg-blue-500/30 text-white hover:bg-blue-500/50'"
-                                class="px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200">
-                            Todos os Voos
-                        </button>
-                        <button @click="setCommercialFilter('commercial')" 
-                                :class="commercialFilter === 'commercial' ? 'bg-green-500 text-white shadow-lg' : 'bg-blue-500/30 text-white hover:bg-blue-500/50'"
-                                class="px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200">
-                            Comerciais
-                        </button>
-                        <button @click="setCommercialFilter('non_commercial')" 
-                                :class="commercialFilter === 'non_commercial' ? 'bg-orange-500 text-white shadow-lg' : 'bg-blue-500/30 text-white hover:bg-blue-500/50'"
-                                class="px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200">
-                            Nao Comerciais
-                        </button>
+                        <button @click="setCommercialFilter('all')" :class="commercialFilter === 'all' ? 'bg-white text-blue-700' : 'bg-blue-500/30 text-white'" class="px-4 py-2 rounded-lg font-medium text-sm">Todos</button>
+                        <button @click="setCommercialFilter('commercial')" :class="commercialFilter === 'commercial' ? 'bg-green-500 text-white' : 'bg-blue-500/30 text-white'" class="px-4 py-2 rounded-lg font-medium text-sm">Comerciais</button>
+                        <button @click="setCommercialFilter('non_commercial')" :class="commercialFilter === 'non_commercial' ? 'bg-orange-500 text-white' : 'bg-blue-500/30 text-white'" class="px-4 py-2 rounded-lg font-medium text-sm">Nao Comerciais</button>
                     </div>
-                    <div class="text-white text-sm">
-                        <span class="opacity-80">Registros:</span> 
-                        <span class="font-bold" x-text="filteredFlights.length.toLocaleString()"></span>
-                    </div>
+                    <div class="text-white text-sm">Registros: <span class="font-bold" x-text="filteredFlights.length.toLocaleString()"></span></div>
                 </div>
             </div>
-            
-            <!-- Tab Content -->
             <div class="bg-white rounded-lg shadow-md p-6">
-                <!-- Dashboard Tab -->
                 <div x-show="activeTab === 'dashboard'">
                     <h2 class="text-2xl font-bold mb-4">Dashboard Geral</h2>
-                    
-                    <!-- KPI Cards -->
                     <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
                         <div class="bg-gradient-to-br from-blue-50 to-white p-4 rounded-lg border border-blue-200">
                             <p class="text-xs text-gray-600">Total Voos</p>
@@ -133,36 +95,21 @@
                             <p class="text-2xl font-bold text-pink-600" x-text="(kpis?.overview?.avg_passengers_per_flight || 0).toFixed(1)"></p>
                         </div>
                     </div>
-                    
-                    <!-- Charts -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                         <div id="category-chart" class="h-80"></div>
                         <div id="monthly-chart" class="h-80"></div>
                     </div>
                 </div>
-                
-                <!-- Temporal Tab -->
                 <div x-show="activeTab === 'time'" x-cloak>
                     <h2 class="text-2xl font-bold mb-4">Analise Temporal</h2>
-                    
-                    <!-- Sub-tabs -->
                     <div class="flex flex-wrap gap-2 mb-6 border-b pb-2">
-                        <button @click="timeSubTab = 'monthly'; loadTimeData()" :class="timeSubTab === 'monthly' ? 'bg-blue-500 text-white' : 'bg-gray-100'" class="px-4 py-2 rounded-lg font-medium text-sm">
-                            Mensal
-                        </button>
-                        <button @click="timeSubTab = 'weekday'; loadTimeData()" :class="timeSubTab === 'weekday' ? 'bg-blue-500 text-white' : 'bg-gray-100'" class="px-4 py-2 rounded-lg font-medium text-sm">
-                            Dias da Semana
-                        </button>
-                        <button @click="timeSubTab = 'hourly'; loadTimeData()" :class="timeSubTab === 'hourly' ? 'bg-blue-500 text-white' : 'bg-gray-100'" class="px-4 py-2 rounded-lg font-medium text-sm">
-                            Por Hora
-                        </button>
+                        <button @click="timeSubTab = 'monthly'; loadTimeData()" :class="timeSubTab === 'monthly' ? 'bg-blue-500 text-white' : 'bg-gray-100'" class="px-4 py-2 rounded-lg font-medium text-sm">Mensal</button>
+                        <button @click="timeSubTab = 'weekday'; loadTimeData()" :class="timeSubTab === 'weekday' ? 'bg-blue-500 text-white' : 'bg-gray-100'" class="px-4 py-2 rounded-lg font-medium text-sm">Dias da Semana</button>
+                        <button @click="timeSubTab = 'hourly'; loadTimeData()" :class="timeSubTab === 'hourly' ? 'bg-blue-500 text-white' : 'bg-gray-100'" class="px-4 py-2 rounded-lg font-medium text-sm">Por Hora</button>
                     </div>
-                    
                     <div id="time-chart" class="h-96"></div>
                     <div id="time-stats" class="mt-4"></div>
                 </div>
-                
-                <!-- Fleet Tab -->
                 <div x-show="activeTab === 'fleet'" x-cloak>
                     <h2 class="text-2xl font-bold mb-4">Analise de Frota</h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -171,39 +118,28 @@
                     </div>
                     <div id="fleet-stats" class="mt-4"></div>
                 </div>
-                
-                <!-- Routes Tab -->
                 <div x-show="activeTab === 'routes'" x-cloak>
                     <h2 class="text-2xl font-bold mb-4">Analise de Rotas</h2>
                     <div id="routes-chart" class="h-96 mb-6"></div>
                     <div id="routes-stats" class="mt-4"></div>
                 </div>
-                
-                <!-- KPIs Tab -->
                 <div x-show="activeTab === 'kpi'" x-cloak>
                     <h2 class="text-2xl font-bold mb-4">KPIs Detalhados</h2>
-                    
-                    <!-- Monthly Trends -->
                     <div class="mb-8">
                         <h3 class="text-lg font-semibold mb-4">Tendencias Mensais</h3>
                         <div id="kpi-monthly-chart" class="h-80"></div>
                     </div>
-                    
-                    <!-- KPI Table -->
                     <div id="kpi-table" class="overflow-x-auto"></div>
                 </div>
             </div>
         </div>
     </main>
-    
-    <!-- Footer -->
     <footer class="bg-gray-800 text-white py-4 px-6 mt-8">
         <div class="max-w-7xl mx-auto text-center text-sm">
             <p>REVO Flight Analytics - Dashboard Publico</p>
             <p class="text-gray-400 mt-1">Dados atualizados em: <span x-text="metadata?.export_date_formatted || '-'"></span></p>
         </div>
     </footer>
-    
     <script src="js/app.js"></script>
 </body>
 </html>
