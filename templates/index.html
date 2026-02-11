@@ -842,14 +842,14 @@
                     
                     <!-- Upload Section -->
                     <div class="bg-white rounded-lg p-4 shadow-sm mb-4">
-                        <h4 class="font-medium mb-3">1️⃣ Upload do Relatório HTML do Salesforce</h4>
+                        <h4 class="font-medium mb-3">1️⃣ Upload do Relatório Salesforce</h4>
                         <form @submit.prevent="uploadSalesforceFile" class="flex items-center gap-4">
-                            <input type="file" id="salesforce-file" accept=".html,.htm,.xls" class="flex-1 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
+                            <input type="file" id="salesforce-file" accept=".html,.htm,.xls,.xlsx" class="flex-1 text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100">
                             <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 text-sm">
                                 ✅ Processar Salesforce
                             </button>
                         </form>
-                        <p class="text-xs text-gray-500 mt-2">Exporte o relatório do Salesforce como HTML ou Excel (.xls salvo como HTML)</p>
+                        <p class="text-xs text-gray-500 mt-2">Exporte o relatório do Salesforce como HTML ou Excel (.xls/.xlsx)</p>
                     </div>
                     
                     <!-- ROTAER Upload (Optional) -->
@@ -2856,7 +2856,7 @@ function dashboardApp() {
         async uploadSalesforceFile() {
             const fileInput = document.getElementById('salesforce-file');
             if (!fileInput.files.length) {
-                alert('Selecione um arquivo HTML do Salesforce');
+                alert('Selecione um arquivo do Salesforce (HTML ou Excel)');
                 return;
             }
             

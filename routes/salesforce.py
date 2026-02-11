@@ -54,16 +54,16 @@ def get_status():
 
 @salesforce_bp.route('/upload', methods=['POST'])
 def upload_salesforce():
-    """Upload and process Salesforce HTML report"""
+    """Upload and process Salesforce report (HTML, XLS, or XLSX)"""
     if 'file' not in request.files:
         return jsonify({'error': 'No file uploaded'}), 400
-    
+
     file = request.files['file']
     if file.filename == '':
         return jsonify({'error': 'No file selected'}), 400
-    
-    if not file.filename.endswith(('.html', '.htm', '.xls')):
-        return jsonify({'error': 'File must be HTML or XLS format'}), 400
+
+    if not file.filename.endswith(('.html', '.htm', '.xls', '.xlsx')):
+        return jsonify({'error': 'File must be HTML, XLS, or XLSX format'}), 400
     
     try:
         # Save uploaded file

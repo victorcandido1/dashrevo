@@ -17,19 +17,27 @@ except ImportError:
     BeautifulSoup = None
 
 
-# Aircraft model mapping
+# Aircraft model mapping (updated with Airbus Helicopters rebrand and full fleet)
 AERONAVE_MODELO = {
-    'PR-OMH': 'EC155',
-    'PR-OMB': 'EC155',
-    'PR-OOE': 'EC135',
-    'PS-HAH': 'H145'
+    'PR-OMH': 'H155',
+    'PR-OMB': 'H155',
+    'PR-OOE': 'H135',
+    'PS-HAH': 'H145',
+    # Legacy EC designations (mapped to current Airbus names)
+    'EC135': 'H135',
+    'EC155': 'H155',
 }
 
 # Passenger capacity per model
 CAPACIDADE_PAX = {
+    'H155': 6,
+    'H135': 5,
+    'H145': 5,
+    'B429': 4,
+    'A109': 4,
+    # Legacy model names (backward compatibility)
     'EC155': 6,
     'EC135': 5,
-    'H145': 5
 }
 
 # Status priority
@@ -72,16 +80,38 @@ class RotaerProcessor:
     
     def __init__(self):
         self.rotaer_coords = {}
-        # Default coordinates for common heliports
+        # Default coordinates for common heliports and airports
         self.default_coords = {
+            # Major airports
             'SBGR': {'lat': -23.4356, 'lon': -46.4731, 'nome': 'Guarulhos'},
-            'SDCO': {'lat': -23.5207, 'lon': -46.8556, 'nome': 'Alphaville'},
             'SBSP': {'lat': -23.6261, 'lon': -46.6564, 'nome': 'Congonhas'},
-            'SBJD': {'lat': -23.1814, 'lon': -46.9436, 'nome': 'Jundiaí'},
             'SBRJ': {'lat': -22.9108, 'lon': -43.1631, 'nome': 'Santos Dumont'},
             'SBGL': {'lat': -22.8089, 'lon': -43.2436, 'nome': 'Galeão'},
+            'SBJD': {'lat': -23.1814, 'lon': -46.9436, 'nome': 'Jundiaí'},
+            'SBMT': {'lat': -23.5092, 'lon': -46.6378, 'nome': 'Marte'},
+            'SBJH': {'lat': -23.4283, 'lon': -47.1658, 'nome': 'Catarina'},
+            'SBKP': {'lat': -23.0074, 'lon': -47.1345, 'nome': 'Viracopos'},
+            # São Paulo heliports
+            'SIAV': {'lat': -23.4361, 'lon': -46.5872, 'nome': 'Helipark'},
+            'SDXQ': {'lat': -23.5856, 'lon': -46.6853, 'nome': 'IP Plaza 2'},
+            'SIIR': {'lat': -23.5925, 'lon': -46.6903, 'nome': 'Brascan Open Mall'},
+            'SDMN': {'lat': -23.5875, 'lon': -46.6936, 'nome': 'Cidade Jardim'},
+            'SIBH': {'lat': -23.5308, 'lon': -46.6419, 'nome': 'Helicidade'},
+            'SDCO': {'lat': -23.5207, 'lon': -46.8556, 'nome': 'Alphaville'},
+            'SDAI': {'lat': -23.4917, 'lon': -46.8486, 'nome': 'Alphaville Helipad'},
             'SDKM': {'lat': -23.5489, 'lon': -46.6531, 'nome': 'Morumbi'},
-            'SSXK': {'lat': -23.7019, 'lon': -46.6978, 'nome': 'Autódromo Interlagos'}
+            'SSXK': {'lat': -23.7019, 'lon': -46.6978, 'nome': 'Autódromo Interlagos'},
+            'SWYD': {'lat': -23.5631, 'lon': -46.6553, 'nome': 'Spazio'},
+            'SDOF': {'lat': -23.5908, 'lon': -46.6844, 'nome': 'Palladium'},
+            'SSOA': {'lat': -23.5300, 'lon': -46.8400, 'nome': 'Bluetree'},
+            'SIDH': {'lat': -23.4917, 'lon': -46.8500, 'nome': 'Brascan Alpha'},
+            'SDPT': {'lat': -23.5650, 'lon': -46.6400, 'nome': 'Parque Paulista'},
+            'SN66': {'lat': -23.5967, 'lon': -46.6897, 'nome': 'Birmann'},
+            'SDAG': {'lat': -23.5500, 'lon': -46.6500, 'nome': 'Águas Espraiadas'},
+            # Interior/other locations
+            'SNGL': {'lat': -23.2108, 'lon': -47.0500, 'nome': 'Fazenda Boa Vista'},
+            'SJTY': {'lat': -23.2000, 'lon': -47.0400, 'nome': 'Tivoli'},
+            'SDAM': {'lat': -23.4283, 'lon': -47.1658, 'nome': 'Catarina'},
         }
         self.rotaer_coords.update(self.default_coords)
     
@@ -170,10 +200,30 @@ class RotaerProcessor:
             'CONGONHAS': 'SBSP',
             'SANTOS DUMONT': 'SBRJ',
             'GALEAO': 'SBGL',
+            'GALEÃO': 'SBGL',
             'JUNDIAI': 'SBJD',
+            'JUNDIAÍ': 'SBJD',
             'MORUMBI': 'SDKM',
             'INTERLAGOS': 'SSXK',
-            'AUTODROMO': 'SSXK'
+            'AUTODROMO': 'SSXK',
+            'AUTÓDROMO': 'SSXK',
+            'HELIPARK': 'SIAV',
+            'BRASCAN': 'SIIR',
+            'IP PLAZA': 'SDXQ',
+            'INTERNATIONAL PLAZA': 'SDXQ',
+            'CIDADE JARDIM': 'SDMN',
+            'HELICIDADE': 'SIBH',
+            'BOA VISTA': 'SNGL',
+            'FAZENDA BOA VISTA': 'SNGL',
+            'CATARINA': 'SBJH',
+            'MARTE': 'SBMT',
+            'VIRACOPOS': 'SBKP',
+            'SPAZIO': 'SWYD',
+            'PALLADIUM': 'SDOF',
+            'BLUETREE': 'SSOA',
+            'BIRMANN': 'SN66',
+            'PARQUE PAULISTA': 'SDPT',
+            'TIVOLI': 'SJTY',
         }
         
         text_upper = text.upper()
@@ -202,41 +252,66 @@ class SalesforceProcessor:
     def __init__(self, rotaer_processor=None):
         self.rotaer = rotaer_processor if rotaer_processor else RotaerProcessor()
         self.df = None
-    
-    def process(self, salesforce_path):
-        """Process Salesforce HTML report"""
+
+    def _read_html_file(self, filepath):
+        """Read Salesforce HTML report and return DataFrame"""
         if BeautifulSoup is None:
-            return {'success': False, 'error': 'BeautifulSoup not installed. Run: pip install beautifulsoup4'}
-        
+            return None
+
+        content = None
+        for encoding in ['iso-8859-1', 'utf-8', 'latin-1', 'cp1252']:
+            try:
+                with open(filepath, 'r', encoding=encoding) as f:
+                    content = f.read()
+                break
+            except:
+                continue
+
+        if content is None:
+            return None
+
+        soup = BeautifulSoup(content, 'html.parser')
+        table = soup.find('table')
+
+        if table is None:
+            return None
+
+        headers = [th.get_text(strip=True) for th in table.find_all('th')]
+        rows_data = []
+        for tr in table.find_all('tr')[1:]:
+            cells = tr.find_all('td')
+            row = [td.get_text(strip=True) for td in cells]
+            if len(row) == len(headers):
+                rows_data.append(row)
+
+        return pd.DataFrame(rows_data, columns=headers)
+
+    def _read_excel_file(self, filepath):
+        """Read Salesforce XLS/XLSX report and return DataFrame"""
         try:
-            # Try different encodings
-            content = None
-            for encoding in ['iso-8859-1', 'utf-8', 'latin-1', 'cp1252']:
-                try:
-                    with open(salesforce_path, 'r', encoding=encoding) as f:
-                        content = f.read()
-                    break
-                except:
-                    continue
-            
-            if content is None:
-                return {'success': False, 'error': 'Could not read file with any encoding'}
-            
-            soup = BeautifulSoup(content, 'html.parser')
-            table = soup.find('table')
-            
-            if table is None:
-                return {'success': False, 'error': 'No table found in HTML file'}
-            
-            headers = [th.get_text(strip=True) for th in table.find_all('th')]
-            rows_data = []
-            for tr in table.find_all('tr')[1:]:
-                cells = tr.find_all('td')
-                row = [td.get_text(strip=True) for td in cells]
-                if len(row) == len(headers):
-                    rows_data.append(row)
-            
-            df = pd.DataFrame(rows_data, columns=headers)
+            df = pd.read_excel(filepath)
+            if len(df) == 0:
+                return None
+            return df
+        except Exception as e:
+            print(f"Error reading Excel file: {e}")
+            return None
+
+    def process(self, salesforce_path):
+        """Process Salesforce report (HTML, XLS, or XLSX)"""
+        try:
+            file_ext = os.path.splitext(salesforce_path)[1].lower()
+
+            if file_ext in ('.xls', '.xlsx'):
+                df = self._read_excel_file(salesforce_path)
+            else:
+                df = self._read_html_file(salesforce_path)
+
+            if df is None:
+                return {'success': False, 'error': 'Could not parse file'}
+
+            if len(df) == 0:
+                return {'success': False, 'error': 'No data rows found in file'}
             
             # Parse revenue
             if 'Valor Total' in df.columns:

@@ -1,10 +1,10 @@
-﻿{
-  "export_date": "2025-12-19T12:00:30.179306",
-  "export_date_formatted": "19/12/2025 12:00",
+{
+  "export_date": "2026-02-11T12:00:00.000000",
+  "export_date_formatted": "11/02/2026 12:00",
   "total_records": 4568,
   "date_range": {
     "start": "2024-01-02",
-    "end": "2025-11-30"
+    "end": "2026-02-11"
   },
   "months_covered": [
     1,
@@ -17,7 +17,8 @@
     8,
     9,
     10,
-    11
+    11,
+    12
   ],
   "total_revenue": 22875457.402037036,
   "total_flights": 4568,

@@ -21,7 +21,7 @@ class Config:
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024
     
     # Data processing settings
-    DEFAULT_YEAR_FILTER = 2025  # Filter to 2025 data by default
+    DEFAULT_YEAR_FILTER = 2026  # Filter to 2026 data by default
     
     # Chart settings
     CHART_DPI = 150
