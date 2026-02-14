@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Radar de Aeronaves - São Paulo</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <title>Radar de Aeronaves - Sao Paulo</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -15,6 +14,54 @@
             color: #e0e0e0;
             overflow: hidden;
             height: 100vh;
+            width: 100vw;
+        }
+
+        /* Loading screen */
+        #loading-screen {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: #0a0e17;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        #loading-screen .loader-text {
+            color: #38bdf8;
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        #loading-screen .loader-sub {
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        #loading-screen .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #1e293b;
+            border-top-color: #38bdf8;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        #error-msg {
+            color: #ef4444;
+            font-size: 13px;
+            margin-top: 16px;
+            max-width: 400px;
+            text-align: center;
+            display: none;
         }
 
         /* Top Bar */
@@ -29,7 +76,6 @@
             justify-content: space-between;
             padding: 0 16px;
             z-index: 1000;
-            backdrop-filter: blur(10px);
         }
 
         #topbar .left {
@@ -77,12 +123,6 @@
 
         .btn:hover { background: #334155; color: #e2e8f0; }
         .btn.active { background: #0ea5e9; color: white; border-color: #0ea5e9; }
-        .btn.alert { background: #dc2626; border-color: #dc2626; color: white; animation: pulse-btn 1.5s infinite; }
-
-        @keyframes pulse-btn {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.7; }
-        }
 
         .status-dot {
             width: 8px; height: 8px;
@@ -103,6 +143,7 @@
             position: fixed;
             top: 48px; left: 0; right: 0; bottom: 0;
             z-index: 1;
+            background: #0a0e17;
         }
 
         /* Tracked Aircraft Panel */
@@ -114,7 +155,6 @@
             border: 1px solid #1e293b;
             border-radius: 10px;
             z-index: 900;
-            backdrop-filter: blur(10px);
             overflow: hidden;
         }
 
@@ -125,9 +165,6 @@
             font-weight: 600;
             color: #38bdf8;
             border-bottom: 1px solid #1e293b;
-            display: flex;
-            align-items: center;
-            gap: 6px;
         }
 
         .tracked-item {
@@ -149,15 +186,15 @@
         .tracked-item .reg.detected { color: #22c55e; }
         .tracked-item .reg.no-signal { color: #64748b; }
 
-        .tracked-item .status {
+        .tracked-item .info {
             font-size: 11px;
             margin-top: 3px;
         }
 
-        .tracked-item .status.em-voo { color: #38bdf8; }
-        .tracked-item .status.no-solo { color: #f59e0b; }
-        .tracked-item .status.sem-sinal { color: #64748b; }
-        .tracked-item .status.sinal-perdido { color: #ef4444; }
+        .tracked-item .info.em-voo { color: #38bdf8; }
+        .tracked-item .info.no-solo { color: #f59e0b; }
+        .tracked-item .info.sem-sinal { color: #64748b; }
+        .tracked-item .info.sinal-perdido { color: #ef4444; }
 
         .tracked-item .details {
             font-size: 10px;
@@ -175,7 +212,6 @@
             border: 1px solid #1e293b;
             border-radius: 10px;
             z-index: 900;
-            backdrop-filter: blur(10px);
             overflow: hidden;
             display: flex;
             flex-direction: column;
@@ -188,9 +224,6 @@
             font-weight: 600;
             color: #f59e0b;
             border-bottom: 1px solid #1e293b;
-            display: flex;
-            align-items: center;
-            gap: 6px;
             flex-shrink: 0;
         }
 
@@ -204,12 +237,6 @@
             padding: 6px 14px;
             font-size: 12px;
             border-bottom: 1px solid rgba(30, 41, 59, 0.3);
-            animation: slideIn 0.3s ease;
-        }
-
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateX(-10px); }
-            to { opacity: 1; transform: translateX(0); }
         }
 
         .event-item .event-time {
@@ -251,9 +278,8 @@
             border-radius: 10px;
             padding: 14px 18px;
             min-width: 280px;
-            animation: notifIn 0.4s ease, notifOut 0.4s ease 5s forwards;
+            animation: notifIn 0.4s ease;
             pointer-events: auto;
-            backdrop-filter: blur(10px);
         }
 
         .notif.takeoff { border-color: #22c55e; }
@@ -280,32 +306,16 @@
             to { opacity: 1; transform: translateX(0); }
         }
 
-        @keyframes notifOut {
-            from { opacity: 1; }
-            to { opacity: 0; transform: translateY(-20px); }
-        }
-
-        /* Aircraft markers */
-        .aircraft-icon {
-            transition: transform 0.5s ease;
-        }
-
-        .aircraft-icon svg {
-            filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
-        }
-
-        /* Leaflet popup styling */
+        /* Leaflet overrides */
         .leaflet-popup-content-wrapper {
             background: rgba(15, 23, 42, 0.95) !important;
             color: #e2e8f0 !important;
             border: 1px solid #334155 !important;
             border-radius: 8px !important;
-            backdrop-filter: blur(10px);
         }
 
         .leaflet-popup-tip {
             background: rgba(15, 23, 42, 0.95) !important;
-            border: 1px solid #334155 !important;
         }
 
         .leaflet-popup-content {
@@ -328,16 +338,9 @@
             text-transform: uppercase;
         }
 
-        .popup-field {
-            color: #94a3b8;
-        }
+        .popup-field { color: #94a3b8; }
+        .popup-value { color: #e2e8f0; font-weight: 500; }
 
-        .popup-value {
-            color: #e2e8f0;
-            font-weight: 500;
-        }
-
-        /* Airport markers */
         .airport-label {
             background: rgba(15, 23, 42, 0.8);
             border: 1px solid #334155;
@@ -349,23 +352,17 @@
             white-space: nowrap;
         }
 
-        /* Custom scrollbar */
-        ::-webkit-scrollbar { width: 4px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
-
-        /* Back to dashboard link */
         .back-link {
             color: #64748b;
             text-decoration: none;
             font-size: 12px;
-            display: flex;
-            align-items: center;
-            gap: 4px;
         }
         .back-link:hover { color: #94a3b8; }
 
-        /* Mobile adjustments */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+
         @media (max-width: 640px) {
             #tracked-panel { width: 200px; }
             #events-panel { width: calc(100% - 24px); max-height: 180px; }
@@ -373,6 +370,14 @@
     </style>
 </head>
 <body>
+
+<!-- Loading Screen -->
+<div id="loading-screen">
+    <div class="spinner"></div>
+    <div class="loader-text">RADAR DE AERONAVES</div>
+    <div class="loader-sub" id="loading-status">Carregando mapa...</div>
+    <div id="error-msg"></div>
+</div>
 
 <!-- Top Bar -->
 <div id="topbar">
@@ -386,15 +391,9 @@
         </div>
     </div>
     <div class="right">
-        <button class="btn active" id="btn-sound" onclick="toggleSound()">
-            &#x1F50A; Som
-        </button>
-        <button class="btn" id="btn-notif" onclick="requestNotifications()">
-            Notificações
-        </button>
-        <button class="btn" onclick="refreshNow()">
-            &#x21BB; Atualizar
-        </button>
+        <button class="btn active" id="btn-sound" onclick="toggleSound()">Som ON</button>
+        <button class="btn" id="btn-notif" onclick="requestNotifications()">Notif.</button>
+        <button class="btn" onclick="refreshNow()">Atualizar</button>
     </div>
 </div>
 
@@ -403,30 +402,26 @@
 
 <!-- Tracked Aircraft Panel -->
 <div id="tracked-panel">
-    <div class="panel-header">
-        &#x1F4E1; AERONAVES RASTREADAS
-    </div>
+    <div class="panel-header">AERONAVES RASTREADAS</div>
     <div id="tracked-list">
         <div class="tracked-item">
             <div class="reg no-signal">PR-OMB</div>
-            <div class="status sem-sinal">Aguardando dados...</div>
+            <div class="info sem-sinal">Aguardando dados...</div>
         </div>
         <div class="tracked-item">
             <div class="reg no-signal">PR-OMH</div>
-            <div class="status sem-sinal">Aguardando dados...</div>
+            <div class="info sem-sinal">Aguardando dados...</div>
         </div>
         <div class="tracked-item">
             <div class="reg no-signal">PR-OOE</div>
-            <div class="status sem-sinal">Aguardando dados...</div>
+            <div class="info sem-sinal">Aguardando dados...</div>
         </div>
     </div>
 </div>
 
 <!-- Events Panel -->
 <div id="events-panel">
-    <div class="panel-header">
-        &#x26A0; EVENTOS
-    </div>
+    <div class="panel-header">EVENTOS</div>
     <div id="events-list">
         <div class="no-events">Aguardando eventos de aeronaves rastreadas...</div>
     </div>
@@ -435,472 +430,548 @@
 <!-- Notification Popup Container -->
 <div id="notification-popup"></div>
 
+<!-- Load Leaflet at end of body -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
+
 <script>
-// ===== Configuration =====
-let CONFIG = {
-    bounds: { lamin: -25.0, lamax: -21.5, lomin: -48.5, lomax: -43.0 },
-    tracked_registrations: ['PR-OMB', 'PR-OMH', 'PR-OOE'],
-    airports: [],
-    refresh_interval: 15,
-    center: { lat: -23.55, lon: -46.63 }
-};
+(function() {
+    'use strict';
 
-let map;
-let aircraftMarkers = {};  // icao24 -> marker
-let airportMarkers = [];
-let boundsRect;
-let soundEnabled = true;
-let refreshTimer = null;
-let eventsList = [];
-let isLoading = false;
+    // ===== Configuration =====
+    var CONFIG = {
+        bounds: { lamin: -25.0, lamax: -21.5, lomin: -48.5, lomax: -43.0 },
+        tracked_registrations: ['PR-OMB', 'PR-OMH', 'PR-OOE'],
+        airports: [],
+        refresh_interval: 15,
+        center: { lat: -23.55, lon: -46.63 }
+    };
 
-// ===== Audio Context for Alerts =====
-let audioCtx = null;
+    var map = null;
+    var aircraftMarkers = {};
+    var airportMarkers = [];
+    var boundsRect = null;
+    var soundEnabled = true;
+    var refreshTimer = null;
+    var eventsList = [];
+    var isLoading = false;
+    var audioCtx = null;
 
-function getAudioContext() {
-    if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    // ===== Loading Screen =====
+    function hideLoading() {
+        var el = document.getElementById('loading-screen');
+        if (el) el.style.display = 'none';
     }
-    return audioCtx;
-}
 
-function playAlertSound(type) {
-    if (!soundEnabled) return;
-    try {
-        const ctx = getAudioContext();
-        if (ctx.state === 'suspended') ctx.resume();
+    function showError(msg) {
+        var el = document.getElementById('error-msg');
+        if (el) {
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+        var sub = document.getElementById('loading-status');
+        if (sub) sub.textContent = 'Erro ao carregar';
+    }
 
-        if (type === 'detected') {
-            // Three rising beeps
-            [0, 0.2, 0.4].forEach((delay, i) => {
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
+    // ===== Audio =====
+    function getAudioCtx() {
+        if (!audioCtx) {
+            try {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            } catch(e) {
+                // Audio not available
+            }
+        }
+        return audioCtx;
+    }
+
+    function playAlertSound(type) {
+        if (!soundEnabled) return;
+        var ctx = getAudioCtx();
+        if (!ctx) return;
+        try {
+            if (ctx.state === 'suspended') ctx.resume();
+
+            if (type === 'detected') {
+                [0, 0.2, 0.4].forEach(function(delay, i) {
+                    var osc = ctx.createOscillator();
+                    var gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = 600 + (i * 200);
+                    osc.type = 'sine';
+                    gain.gain.setValueAtTime(0.3, ctx.currentTime + delay);
+                    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + delay + 0.15);
+                    osc.start(ctx.currentTime + delay);
+                    osc.stop(ctx.currentTime + delay + 0.15);
+                });
+            } else if (type === 'takeoff') {
+                var osc = ctx.createOscillator();
+                var gain = ctx.createGain();
                 osc.connect(gain);
                 gain.connect(ctx.destination);
-                osc.frequency.value = 600 + (i * 200);
+                osc.frequency.setValueAtTime(400, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.5);
                 osc.type = 'sine';
-                gain.gain.setValueAtTime(0.3, ctx.currentTime + delay);
-                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + delay + 0.15);
-                osc.start(ctx.currentTime + delay);
-                osc.stop(ctx.currentTime + delay + 0.15);
-            });
-        } else if (type === 'takeoff') {
-            // Rising sweep
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.frequency.setValueAtTime(400, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(1200, ctx.currentTime + 0.5);
-            osc.type = 'sine';
-            gain.gain.setValueAtTime(0.3, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
-            osc.start(ctx.currentTime);
-            osc.stop(ctx.currentTime + 0.6);
-        } else if (type === 'landing') {
-            // Descending sweep
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.frequency.setValueAtTime(1000, ctx.currentTime);
-            osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.5);
-            osc.type = 'sine';
-            gain.gain.setValueAtTime(0.3, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
-            osc.start(ctx.currentTime);
-            osc.stop(ctx.currentTime + 0.6);
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.6);
+            } else if (type === 'landing') {
+                var osc2 = ctx.createOscillator();
+                var gain2 = ctx.createGain();
+                osc2.connect(gain2);
+                gain2.connect(ctx.destination);
+                osc2.frequency.setValueAtTime(1000, ctx.currentTime);
+                osc2.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.5);
+                osc2.type = 'sine';
+                gain2.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.6);
+                osc2.start(ctx.currentTime);
+                osc2.stop(ctx.currentTime + 0.6);
+            }
+        } catch (e) {
+            console.warn('Audio error:', e);
         }
-    } catch (e) {
-        console.warn('Audio error:', e);
     }
-}
 
-// ===== Initialize Map =====
-function initMap() {
-    map = L.map('map', {
-        center: [CONFIG.center.lat, CONFIG.center.lon],
-        zoom: 8,
-        zoomControl: true,
-        attributionControl: true
-    });
+    // ===== Map =====
+    function initMap() {
+        if (typeof L === 'undefined') {
+            throw new Error('Leaflet nao carregou. Verifique sua conexao.');
+        }
 
-    // Dark map tiles
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 19
-    }).addTo(map);
+        map = L.map('map', {
+            center: [CONFIG.center.lat, CONFIG.center.lon],
+            zoom: 8,
+            zoomControl: true
+        });
 
-    // Region bounds rectangle
-    boundsRect = L.rectangle(
-        [[CONFIG.bounds.lamin, CONFIG.bounds.lomin], [CONFIG.bounds.lamax, CONFIG.bounds.lomax]],
-        { color: '#38bdf8', weight: 1, opacity: 0.3, fill: false, dashArray: '5, 5' }
-    ).addTo(map);
-}
-
-function addAirports(airports) {
-    airports.forEach(apt => {
-        const marker = L.marker([apt.lat, apt.lon], {
-            icon: L.divIcon({
-                className: 'airport-marker',
-                html: `<div class="airport-label">${apt.icao}</div>`,
-                iconSize: [50, 16],
-                iconAnchor: [25, 8]
-            }),
-            zIndexOffset: -100
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+            maxZoom: 19
         }).addTo(map);
-        marker.bindPopup(`<b>${apt.icao}</b><br>${apt.name}`);
-        airportMarkers.push(marker);
-    });
-}
 
-// ===== Aircraft SVG Icon =====
-function createAircraftSvg(heading, isTracked, onGround) {
-    const rotation = heading != null ? heading : 0;
-    let color;
-    if (isTracked) {
-        color = onGround ? '#f59e0b' : '#22c55e';
-    } else {
-        color = onGround ? '#475569' : '#64748b';
+        boundsRect = L.rectangle(
+            [[CONFIG.bounds.lamin, CONFIG.bounds.lomin], [CONFIG.bounds.lamax, CONFIG.bounds.lomax]],
+            { color: '#38bdf8', weight: 1, opacity: 0.3, fill: false, dashArray: '5, 5' }
+        ).addTo(map);
+
+        // Force a resize after a short delay to ensure proper rendering
+        setTimeout(function() {
+            map.invalidateSize();
+        }, 200);
     }
-    const size = isTracked ? 28 : 18;
-    const opacity = isTracked ? 1.0 : 0.7;
 
-    return L.divIcon({
-        className: 'aircraft-icon',
-        html: `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="transform: rotate(${rotation}deg); opacity: ${opacity};">
-            <path d="M12 2 L10 9 L3 12 L10 13 L10 20 L8 22 L12 21 L16 22 L14 20 L14 13 L21 12 L14 9 Z"
-                  fill="${color}" stroke="${isTracked ? '#fff' : 'none'}" stroke-width="${isTracked ? 1 : 0}"/>
-        </svg>`,
-        iconSize: [size, size],
-        iconAnchor: [size/2, size/2]
-    });
-}
-
-// ===== Update Aircraft on Map =====
-function updateAircraft(aircraftList) {
-    const currentIcaos = new Set();
-
-    aircraftList.forEach(ac => {
-        if (!ac.latitude || !ac.longitude) return;
-        currentIcaos.add(ac.icao24);
-
-        const icon = createAircraftSvg(ac.heading, ac.is_tracked, ac.on_ground);
-
-        if (aircraftMarkers[ac.icao24]) {
-            // Update existing marker
-            aircraftMarkers[ac.icao24].setLatLng([ac.latitude, ac.longitude]);
-            aircraftMarkers[ac.icao24].setIcon(icon);
-            aircraftMarkers[ac.icao24].setZIndexOffset(ac.is_tracked ? 1000 : 0);
-        } else {
-            // Create new marker
-            const marker = L.marker([ac.latitude, ac.longitude], {
-                icon: icon,
-                zIndexOffset: ac.is_tracked ? 1000 : 0
+    function addAirports(airports) {
+        if (!map || typeof L === 'undefined') return;
+        airports.forEach(function(apt) {
+            var marker = L.marker([apt.lat, apt.lon], {
+                icon: L.divIcon({
+                    className: 'airport-marker',
+                    html: '<div class="airport-label">' + apt.icao + '</div>',
+                    iconSize: [50, 16],
+                    iconAnchor: [25, 8]
+                }),
+                zIndexOffset: -100
             }).addTo(map);
-            aircraftMarkers[ac.icao24] = marker;
-        }
-
-        // Update popup content
-        const popupContent = buildPopup(ac);
-        aircraftMarkers[ac.icao24].bindPopup(popupContent);
-    });
-
-    // Remove markers for aircraft no longer in data
-    Object.keys(aircraftMarkers).forEach(icao24 => {
-        if (!currentIcaos.has(icao24)) {
-            map.removeLayer(aircraftMarkers[icao24]);
-            delete aircraftMarkers[icao24];
-        }
-    });
-}
-
-function buildPopup(ac) {
-    const tracked = ac.is_tracked ? `<div class="popup-tracked">RASTREADO</div>` : '';
-    const reg = ac.registration || ac.callsign || ac.icao24;
-    const alt = ac.altitude_ft != null ? `${ac.altitude_ft.toLocaleString()} ft` : '-';
-    const spd = ac.velocity_kt != null ? `${ac.velocity_kt} kt` : '-';
-    const vr = ac.vertical_rate != null ? `${ac.vertical_rate > 0 ? '+' : ''}${Math.round(ac.vertical_rate * 196.85)} ft/min` : '-';
-    const hdg = ac.heading != null ? `${Math.round(ac.heading)}°` : '-';
-    const status = ac.on_ground ? '<span style="color:#f59e0b">No solo</span>' : '<span style="color:#22c55e">Em voo</span>';
-
-    return `
-        <div class="popup-reg">${reg}</div>
-        ${tracked}
-        <div style="margin-top:6px;">
-            <span class="popup-field">ICAO24:</span> <span class="popup-value">${ac.icao24}</span><br>
-            <span class="popup-field">Callsign:</span> <span class="popup-value">${ac.callsign || '-'}</span><br>
-            <span class="popup-field">Status:</span> ${status}<br>
-            <span class="popup-field">Altitude:</span> <span class="popup-value">${alt}</span><br>
-            <span class="popup-field">Velocidade:</span> <span class="popup-value">${spd}</span><br>
-            <span class="popup-field">Proa:</span> <span class="popup-value">${hdg}</span><br>
-            <span class="popup-field">Razão Vertical:</span> <span class="popup-value">${vr}</span><br>
-            <span class="popup-field">País:</span> <span class="popup-value">${ac.origin_country || '-'}</span>
-        </div>
-    `;
-}
-
-// ===== Tracked Aircraft Panel =====
-function updateTrackedPanel(trackedData) {
-    const container = document.getElementById('tracked-list');
-    if (!trackedData) return;
-
-    let html = '';
-    CONFIG.tracked_registrations.forEach(reg => {
-        const info = trackedData[reg] || { status: 'sem sinal', details: null };
-        const statusClass = info.status.replace(' ', '-').replace('á', 'a');
-        const regClass = info.status === 'sem sinal' ? 'no-signal' : 'detected';
-
-        let detailsHtml = '';
-        if (info.details) {
-            const parts = [];
-            if (info.details.altitude_ft != null) parts.push(`ALT: ${info.details.altitude_ft.toLocaleString()} ft`);
-            if (info.details.velocity_kt != null) parts.push(`VEL: ${info.details.velocity_kt} kt`);
-            if (info.details.heading != null) parts.push(`HDG: ${Math.round(info.details.heading)}°`);
-            detailsHtml = `<div class="details">${parts.join(' | ')}</div>`;
-        }
-
-        const onclick = info.details ? `onclick="flyToAircraft(${info.details.lat}, ${info.details.lon})"` : '';
-
-        html += `
-            <div class="tracked-item" ${onclick}>
-                <div class="reg ${regClass}">${reg}</div>
-                <div class="status ${statusClass}">${info.status.toUpperCase()}</div>
-                ${detailsHtml}
-            </div>
-        `;
-    });
-    container.innerHTML = html;
-}
-
-function flyToAircraft(lat, lon) {
-    if (lat && lon) {
-        map.flyTo([lat, lon], 12, { duration: 1 });
-    }
-}
-
-// ===== Events Panel =====
-function addEvents(newEvents) {
-    if (!newEvents || newEvents.length === 0) return;
-
-    newEvents.forEach(evt => {
-        eventsList.unshift(evt);
-
-        // Play sound
-        playAlertSound(evt.type);
-
-        // Show popup notification
-        showPopupNotification(evt);
-
-        // Browser notification
-        sendBrowserNotification(evt);
-    });
-
-    // Keep last 50 events
-    eventsList = eventsList.slice(0, 50);
-    renderEvents();
-}
-
-function renderEvents() {
-    const container = document.getElementById('events-list');
-    if (eventsList.length === 0) {
-        container.innerHTML = '<div class="no-events">Aguardando eventos de aeronaves rastreadas...</div>';
-        return;
+            marker.bindPopup('<b>' + apt.icao + '</b><br>' + apt.name);
+            airportMarkers.push(marker);
+        });
     }
 
-    let html = '';
-    eventsList.forEach(evt => {
-        const time = evt.time ? new Date(evt.time).toLocaleTimeString('pt-BR') : '--:--';
-        const typeLabels = {
-            'takeoff': 'DECOLAGEM',
-            'landing': 'POUSO',
-            'detected': 'DETECTADO',
-            'lost_signal': 'SINAL PERDIDO'
-        };
-        html += `
-            <div class="event-item ${evt.type}">
-                <div class="event-msg">${typeLabels[evt.type] || evt.type} - ${evt.registration || ''}</div>
-                <div class="event-time">${time} - ${evt.message || ''}</div>
-            </div>
-        `;
-    });
-    container.innerHTML = html;
-}
+    // ===== Aircraft Icon =====
+    function createAircraftIcon(heading, isTracked, onGround) {
+        var rotation = (heading != null) ? heading : 0;
+        var color;
+        if (isTracked) {
+            color = onGround ? '#f59e0b' : '#22c55e';
+        } else {
+            color = onGround ? '#475569' : '#64748b';
+        }
+        var size = isTracked ? 28 : 18;
+        var opacity = isTracked ? 1.0 : 0.7;
+        var strokeW = isTracked ? 1 : 0;
+        var stroke = isTracked ? '#fff' : 'none';
 
-// ===== Popup Notifications =====
-function showPopupNotification(evt) {
-    const container = document.getElementById('notification-popup');
-    const typeLabels = {
+        var svg = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" style="transform:rotate(' + rotation + 'deg);opacity:' + opacity + ';">' +
+            '<path d="M12 2 L10 9 L3 12 L10 13 L10 20 L8 22 L12 21 L16 22 L14 20 L14 13 L21 12 L14 9 Z" ' +
+            'fill="' + color + '" stroke="' + stroke + '" stroke-width="' + strokeW + '"/>' +
+            '</svg>';
+
+        return L.divIcon({
+            className: 'aircraft-icon',
+            html: svg,
+            iconSize: [size, size],
+            iconAnchor: [size/2, size/2]
+        });
+    }
+
+    // ===== Update Aircraft =====
+    function updateAircraft(aircraftList) {
+        if (!map || typeof L === 'undefined') return;
+        var currentIcaos = {};
+
+        for (var i = 0; i < aircraftList.length; i++) {
+            var ac = aircraftList[i];
+            if (!ac.latitude || !ac.longitude) continue;
+            currentIcaos[ac.icao24] = true;
+
+            var icon = createAircraftIcon(ac.heading, ac.is_tracked, ac.on_ground);
+
+            if (aircraftMarkers[ac.icao24]) {
+                aircraftMarkers[ac.icao24].setLatLng([ac.latitude, ac.longitude]);
+                aircraftMarkers[ac.icao24].setIcon(icon);
+                aircraftMarkers[ac.icao24].setZIndexOffset(ac.is_tracked ? 1000 : 0);
+            } else {
+                var marker = L.marker([ac.latitude, ac.longitude], {
+                    icon: icon,
+                    zIndexOffset: ac.is_tracked ? 1000 : 0
+                }).addTo(map);
+                aircraftMarkers[ac.icao24] = marker;
+            }
+
+            aircraftMarkers[ac.icao24].bindPopup(buildPopup(ac));
+        }
+
+        // Remove stale markers
+        var keys = Object.keys(aircraftMarkers);
+        for (var j = 0; j < keys.length; j++) {
+            if (!currentIcaos[keys[j]]) {
+                map.removeLayer(aircraftMarkers[keys[j]]);
+                delete aircraftMarkers[keys[j]];
+            }
+        }
+    }
+
+    function buildPopup(ac) {
+        var tracked = ac.is_tracked ? '<div class="popup-tracked">RASTREADO</div>' : '';
+        var reg = ac.registration || ac.callsign || ac.icao24;
+        var alt = (ac.altitude_ft != null) ? ac.altitude_ft.toLocaleString() + ' ft' : '-';
+        var spd = (ac.velocity_kt != null) ? ac.velocity_kt + ' kt' : '-';
+        var hdg = (ac.heading != null) ? Math.round(ac.heading) + ' graus' : '-';
+        var vr = '-';
+        if (ac.vertical_rate != null) {
+            var fpm = Math.round(ac.vertical_rate * 196.85);
+            vr = (fpm > 0 ? '+' : '') + fpm + ' ft/min';
+        }
+        var statusTxt = ac.on_ground ? '<span style="color:#f59e0b">No solo</span>' : '<span style="color:#22c55e">Em voo</span>';
+
+        return '<div class="popup-reg">' + reg + '</div>' +
+            tracked +
+            '<div style="margin-top:6px;">' +
+            '<span class="popup-field">ICAO24:</span> <span class="popup-value">' + ac.icao24 + '</span><br>' +
+            '<span class="popup-field">Callsign:</span> <span class="popup-value">' + (ac.callsign || '-') + '</span><br>' +
+            '<span class="popup-field">Status:</span> ' + statusTxt + '<br>' +
+            '<span class="popup-field">Altitude:</span> <span class="popup-value">' + alt + '</span><br>' +
+            '<span class="popup-field">Velocidade:</span> <span class="popup-value">' + spd + '</span><br>' +
+            '<span class="popup-field">Proa:</span> <span class="popup-value">' + hdg + '</span><br>' +
+            '<span class="popup-field">Razao Vertical:</span> <span class="popup-value">' + vr + '</span><br>' +
+            '<span class="popup-field">Pais:</span> <span class="popup-value">' + (ac.origin_country || '-') + '</span>' +
+            '</div>';
+    }
+
+    // ===== Tracked Panel =====
+    function updateTrackedPanel(trackedData) {
+        var container = document.getElementById('tracked-list');
+        if (!trackedData || !container) return;
+
+        var html = '';
+        for (var i = 0; i < CONFIG.tracked_registrations.length; i++) {
+            var reg = CONFIG.tracked_registrations[i];
+            var inf = trackedData[reg] || { status: 'sem sinal', details: null };
+            var statusClass = inf.status.replace(/ /g, '-');
+            var regClass = (inf.status === 'sem sinal' || inf.status === 'sinal perdido') ? 'no-signal' : 'detected';
+
+            var detailsHtml = '';
+            var onclickAttr = '';
+            if (inf.details) {
+                var parts = [];
+                if (inf.details.altitude_ft != null) parts.push('ALT: ' + inf.details.altitude_ft.toLocaleString() + ' ft');
+                if (inf.details.velocity_kt != null) parts.push('VEL: ' + inf.details.velocity_kt + ' kt');
+                if (inf.details.heading != null) parts.push('HDG: ' + Math.round(inf.details.heading) + ' graus');
+                detailsHtml = '<div class="details">' + parts.join(' | ') + '</div>';
+                onclickAttr = ' onclick="window._flyTo(' + inf.details.lat + ',' + inf.details.lon + ')"';
+            }
+
+            html += '<div class="tracked-item"' + onclickAttr + '>' +
+                '<div class="reg ' + regClass + '">' + reg + '</div>' +
+                '<div class="info ' + statusClass + '">' + inf.status.toUpperCase() + '</div>' +
+                detailsHtml +
+                '</div>';
+        }
+        container.innerHTML = html;
+    }
+
+    // Global flyTo function
+    window._flyTo = function(lat, lon) {
+        if (map && lat && lon) {
+            map.flyTo([lat, lon], 12, { duration: 1 });
+        }
+    };
+
+    // ===== Events =====
+    var TYPE_LABELS = {
         'takeoff': 'DECOLAGEM',
         'landing': 'POUSO',
         'detected': 'DETECTADO',
         'lost_signal': 'SINAL PERDIDO'
     };
 
-    const div = document.createElement('div');
-    div.className = `notif ${evt.type}`;
-    div.innerHTML = `
-        <div class="notif-title">${typeLabels[evt.type] || evt.type}</div>
-        <div class="notif-body">${evt.message || evt.registration}</div>
-    `;
-    container.appendChild(div);
+    function addEvents(newEvents) {
+        if (!newEvents || newEvents.length === 0) return;
 
-    // Remove after animation
-    setTimeout(() => {
-        if (div.parentNode) div.parentNode.removeChild(div);
-    }, 5500);
-}
+        for (var i = 0; i < newEvents.length; i++) {
+            var evt = newEvents[i];
+            eventsList.unshift(evt);
+            playAlertSound(evt.type);
+            showPopupNotification(evt);
+            sendBrowserNotification(evt);
+        }
 
-// ===== Browser Notifications =====
-function requestNotifications() {
-    if ('Notification' in window) {
-        Notification.requestPermission().then(perm => {
-            const btn = document.getElementById('btn-notif');
-            if (perm === 'granted') {
-                btn.classList.add('active');
-                btn.textContent = 'Notificações ON';
-            } else {
-                btn.textContent = 'Bloqueado';
+        if (eventsList.length > 50) eventsList = eventsList.slice(0, 50);
+        renderEvents();
+    }
+
+    function renderEvents() {
+        var container = document.getElementById('events-list');
+        if (!container) return;
+        if (eventsList.length === 0) {
+            container.innerHTML = '<div class="no-events">Aguardando eventos de aeronaves rastreadas...</div>';
+            return;
+        }
+
+        var html = '';
+        for (var i = 0; i < eventsList.length; i++) {
+            var evt = eventsList[i];
+            var timeStr = '--:--';
+            if (evt.time) {
+                try { timeStr = new Date(evt.time).toLocaleTimeString('pt-BR'); } catch(e) { timeStr = evt.time; }
             }
-        });
+            html += '<div class="event-item ' + (evt.type || '') + '">' +
+                '<div class="event-msg">' + (TYPE_LABELS[evt.type] || evt.type) + ' - ' + (evt.registration || '') + '</div>' +
+                '<div class="event-time">' + timeStr + ' - ' + (evt.message || '') + '</div>' +
+                '</div>';
+        }
+        container.innerHTML = html;
     }
-}
 
-function sendBrowserNotification(evt) {
-    if ('Notification' in window && Notification.permission === 'granted') {
-        const typeLabels = {
-            'takeoff': 'DECOLAGEM',
-            'landing': 'POUSO',
-            'detected': 'DETECTADO',
-            'lost_signal': 'SINAL PERDIDO'
-        };
-        new Notification(`${typeLabels[evt.type]} - ${evt.registration || ''}`, {
-            body: evt.message || '',
-            icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><text y="20" font-size="20">✈️</text></svg>',
-            tag: `tracker-${evt.type}-${evt.registration}`,
-            requireInteraction: false
-        });
+    function showPopupNotification(evt) {
+        var container = document.getElementById('notification-popup');
+        if (!container) return;
+
+        var div = document.createElement('div');
+        div.className = 'notif ' + (evt.type || '');
+        div.innerHTML = '<div class="notif-title">' + (TYPE_LABELS[evt.type] || evt.type) + '</div>' +
+            '<div class="notif-body">' + (evt.message || evt.registration || '') + '</div>';
+        container.appendChild(div);
+
+        setTimeout(function() {
+            if (div.parentNode) div.parentNode.removeChild(div);
+        }, 5500);
     }
-}
 
-// ===== Sound Toggle =====
-function toggleSound() {
-    soundEnabled = !soundEnabled;
-    const btn = document.getElementById('btn-sound');
-    if (soundEnabled) {
-        btn.classList.add('active');
-        btn.innerHTML = '&#x1F50A; Som';
-        // Initialize audio context on user interaction
-        getAudioContext();
-    } else {
-        btn.classList.remove('active');
-        btn.innerHTML = '&#x1F507; Mudo';
+    // ===== Browser Notifications =====
+    window.requestNotifications = function() {
+        if ('Notification' in window) {
+            Notification.requestPermission().then(function(perm) {
+                var btn = document.getElementById('btn-notif');
+                if (perm === 'granted') {
+                    btn.classList.add('active');
+                    btn.textContent = 'Notif. ON';
+                } else {
+                    btn.textContent = 'Bloqueado';
+                }
+            });
+        }
+    };
+
+    function sendBrowserNotification(evt) {
+        if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+                new Notification((TYPE_LABELS[evt.type] || '') + ' - ' + (evt.registration || ''), {
+                    body: evt.message || '',
+                    tag: 'tracker-' + evt.type + '-' + evt.registration
+                });
+            } catch(e) { /* ignore */ }
+        }
     }
-}
 
-// ===== Data Fetching =====
-async function fetchAircraft() {
-    if (isLoading) return;
-    isLoading = true;
-
-    const dot = document.getElementById('status-dot');
-    dot.className = 'status-dot loading';
-
-    try {
-        const response = await fetch('/api/tracker/aircraft');
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const data = await response.json();
-
-        if (data.error) {
-            console.warn('API warning:', data.error);
-            dot.className = 'status-dot offline';
+    // ===== Sound Toggle =====
+    window.toggleSound = function() {
+        soundEnabled = !soundEnabled;
+        var btn = document.getElementById('btn-sound');
+        if (soundEnabled) {
+            btn.classList.add('active');
+            btn.textContent = 'Som ON';
+            getAudioCtx();
         } else {
-            dot.className = 'status-dot online';
+            btn.classList.remove('active');
+            btn.textContent = 'Som OFF';
         }
+    };
 
-        // Update aircraft count
-        document.getElementById('aircraft-count').textContent = data.total || 0;
+    // ===== Data Fetching =====
+    function fetchAircraft() {
+        if (isLoading) return;
+        isLoading = true;
 
-        // Update time
-        const now = new Date();
-        document.getElementById('last-update').textContent = now.toLocaleTimeString('pt-BR');
+        var dot = document.getElementById('status-dot');
+        if (dot) dot.className = 'status-dot loading';
 
-        // Update map markers
-        if (data.aircraft) {
-            updateAircraft(data.aircraft);
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/tracker/aircraft', true);
+        xhr.timeout = 20000;
+
+        xhr.onload = function() {
+            isLoading = false;
+            if (xhr.status === 200) {
+                try {
+                    var data = JSON.parse(xhr.responseText);
+
+                    if (data.error) {
+                        console.warn('API warning:', data.error);
+                        if (dot) dot.className = 'status-dot offline';
+                    } else {
+                        if (dot) dot.className = 'status-dot online';
+                    }
+
+                    var countEl = document.getElementById('aircraft-count');
+                    if (countEl) countEl.textContent = data.total || 0;
+
+                    var timeEl = document.getElementById('last-update');
+                    if (timeEl) timeEl.textContent = new Date().toLocaleTimeString('pt-BR');
+
+                    if (data.aircraft) updateAircraft(data.aircraft);
+                    if (data.tracked_aircraft) updateTrackedPanel(data.tracked_aircraft);
+                    if (data.tracked_events && data.tracked_events.length > 0) addEvents(data.tracked_events);
+
+                } catch(e) {
+                    console.error('Parse error:', e);
+                    if (dot) dot.className = 'status-dot offline';
+                }
+            } else {
+                console.error('HTTP error:', xhr.status);
+                if (dot) dot.className = 'status-dot offline';
+            }
+        };
+
+        xhr.onerror = function() {
+            isLoading = false;
+            console.error('Network error');
+            if (dot) dot.className = 'status-dot offline';
+        };
+
+        xhr.ontimeout = function() {
+            isLoading = false;
+            console.error('Request timeout');
+            if (dot) dot.className = 'status-dot offline';
+        };
+
+        xhr.send();
+    }
+
+    function loadConfig(callback) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/tracker/config', true);
+        xhr.timeout = 10000;
+
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                try {
+                    var data = JSON.parse(xhr.responseText);
+                    if (data.bounds) CONFIG.bounds = data.bounds;
+                    if (data.center) CONFIG.center = data.center;
+                    if (data.tracked_registrations) CONFIG.tracked_registrations = data.tracked_registrations;
+                    if (data.airports) CONFIG.airports = data.airports;
+                    if (data.refresh_interval) CONFIG.refresh_interval = data.refresh_interval;
+                } catch(e) {
+                    console.warn('Config parse error, using defaults');
+                }
+            }
+            callback();
+        };
+
+        xhr.onerror = function() {
+            console.warn('Config load error, using defaults');
+            callback();
+        };
+
+        xhr.ontimeout = function() {
+            console.warn('Config timeout, using defaults');
+            callback();
+        };
+
+        xhr.send();
+    }
+
+    window.refreshNow = function() {
+        if (refreshTimer) clearInterval(refreshTimer);
+        fetchAircraft();
+        refreshTimer = setInterval(fetchAircraft, CONFIG.refresh_interval * 1000);
+    };
+
+    // ===== Initialization =====
+    function init() {
+        var loadingStatus = document.getElementById('loading-status');
+
+        try {
+            if (loadingStatus) loadingStatus.textContent = 'Carregando configuracao...';
+
+            loadConfig(function() {
+                try {
+                    if (loadingStatus) loadingStatus.textContent = 'Inicializando mapa...';
+
+                    initMap();
+
+                    if (CONFIG.airports && CONFIG.airports.length > 0) {
+                        addAirports(CONFIG.airports);
+                    }
+
+                    if (boundsRect) {
+                        boundsRect.setBounds([
+                            [CONFIG.bounds.lamin, CONFIG.bounds.lomin],
+                            [CONFIG.bounds.lamax, CONFIG.bounds.lomax]
+                        ]);
+                    }
+
+                    hideLoading();
+
+                    if (loadingStatus) loadingStatus.textContent = 'Buscando aeronaves...';
+
+                    fetchAircraft();
+                    refreshTimer = setInterval(fetchAircraft, CONFIG.refresh_interval * 1000);
+
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        var btn = document.getElementById('btn-notif');
+                        if (btn) {
+                            btn.classList.add('active');
+                            btn.textContent = 'Notif. ON';
+                        }
+                    }
+
+                } catch(e) {
+                    console.error('Init error:', e);
+                    showError('Erro ao inicializar: ' + e.message);
+                }
+            });
+
+        } catch(e) {
+            console.error('Startup error:', e);
+            showError('Erro ao iniciar: ' + e.message);
         }
-
-        // Update tracked panel
-        if (data.tracked_aircraft) {
-            updateTrackedPanel(data.tracked_aircraft);
-        }
-
-        // Process events
-        if (data.tracked_events && data.tracked_events.length > 0) {
-            addEvents(data.tracked_events);
-        }
-
-    } catch (err) {
-        console.error('Fetch error:', err);
-        document.getElementById('status-dot').className = 'status-dot offline';
-    } finally {
-        isLoading = false;
-    }
-}
-
-async function loadConfig() {
-    try {
-        const response = await fetch('/api/tracker/config');
-        const data = await response.json();
-        if (data.bounds) CONFIG.bounds = data.bounds;
-        if (data.center) CONFIG.center = data.center;
-        if (data.tracked_registrations) CONFIG.tracked_registrations = data.tracked_registrations;
-        if (data.airports) CONFIG.airports = data.airports;
-        if (data.refresh_interval) CONFIG.refresh_interval = data.refresh_interval;
-    } catch (e) {
-        console.warn('Could not load config, using defaults');
-    }
-}
-
-function refreshNow() {
-    // Reset timer and fetch immediately
-    if (refreshTimer) clearInterval(refreshTimer);
-    fetchAircraft();
-    refreshTimer = setInterval(fetchAircraft, CONFIG.refresh_interval * 1000);
-}
-
-// ===== Initialization =====
-async function init() {
-    await loadConfig();
-    initMap();
-
-    if (CONFIG.airports && CONFIG.airports.length > 0) {
-        addAirports(CONFIG.airports);
     }
 
-    // Update bounds rectangle with config
-    if (boundsRect) {
-        boundsRect.setBounds([
-            [CONFIG.bounds.lamin, CONFIG.bounds.lomin],
-            [CONFIG.bounds.lamax, CONFIG.bounds.lomax]
-        ]);
+    // Wait for DOM and then start
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            // Extra delay to ensure Leaflet is parsed
+            setTimeout(init, 100);
+        });
+    } else {
+        setTimeout(init, 100);
     }
 
-    // Start fetching
-    await fetchAircraft();
-    refreshTimer = setInterval(fetchAircraft, CONFIG.refresh_interval * 1000);
-
-    // Check notification permission status
-    if ('Notification' in window && Notification.permission === 'granted') {
-        const btn = document.getElementById('btn-notif');
-        btn.classList.add('active');
-        btn.textContent = 'Notificações ON';
-    }
-}
-
-// Start the app
-document.addEventListener('DOMContentLoaded', init);
+})();
 </script>
 
 </body>
