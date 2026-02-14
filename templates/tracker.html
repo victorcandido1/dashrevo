@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Radar de Aeronaves - Sao Paulo</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/leaflet.css') }}" />
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -431,7 +431,7 @@
 <div id="notification-popup"></div>
 
 <!-- Load Leaflet at end of body -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
+<script src="{{ url_for('static', filename='vendor/leaflet.js') }}"></script>
 
 <script>
 (function() {
