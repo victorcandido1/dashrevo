@@ -8,6 +8,7 @@ from routes.api import api_bp, set_data_processor, get_data_processor
 from routes.upload import upload_bp
 from routes.manifesto import manifesto_bp
 from routes.salesforce import salesforce_bp
+from routes.tracker import tracker_bp
 import os
 
 app = Flask(__name__)
@@ -20,6 +21,7 @@ app.register_blueprint(api_bp, url_prefix='/api')
 app.register_blueprint(upload_bp, url_prefix='/api')
 app.register_blueprint(manifesto_bp, url_prefix='/api/manifesto')
 app.register_blueprint(salesforce_bp, url_prefix='/api/salesforce')
+app.register_blueprint(tracker_bp)
 
 # Load cache automatically on first request
 @app.before_request
