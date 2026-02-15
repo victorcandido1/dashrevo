@@ -36,6 +36,25 @@ pip install -r requirements.txt
 - `uploads/` - Para arquivos Excel enviados por usuários
 - `.cache/` - Para dados em cache (já pré-carregado)
 
+### Integração com Revo Bot (movimentação de aeronaves)
+
+Para enviar mensagens automáticas ao Revo Bot quando houver movimentação de aeronaves:
+
+```bash
+export REVO_BOT_WEBHOOK_URL="https://seu-endpoint-do-bot"
+export REVO_BOT_TOKEN="opcional"
+export REVO_BOT_ENABLED="true"
+export REVO_BOT_LIVE_MAP_URL="https://seu-dominio/tracker"
+```
+
+Variáveis opcionais:
+- `REVO_BOT_TIMEOUT_SECONDS` (padrão: `10`)
+- `REVO_BOT_MAX_MOVES_PER_RUN` (padrão: `200`)
+- `REVO_BOT_STATE_FILE` (padrão: `.cache/revo_bot_sent_moves.json`)
+
+O sistema evita reenvio duplicado de movimentos já notificados, usando arquivo de estado em cache.
+Cada mensagem enviada ao bot inclui o link do mapa ao vivo.
+
 ## 🏃 Executando Localmente
 
 ```bash

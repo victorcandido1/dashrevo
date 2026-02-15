@@ -18,6 +18,30 @@ _salesforce_processor = None
 _rotaer_processor = None
 
 
+def _build_live_map_url():
+    """Build the live-map URL attached to Revo Bot messages."""
+    configured = os.environ.get('REVO_BOT_LIVE_MAP_URL', '').strip()
+    if configured:
+        return configured
+    return f"{request.url_root.rstrip('/')}/tracker"
+
+
+def _notify_revo_bot_for_moves(df, source, live_map_url=''):
+    """Notify Revo Bot while keeping Salesforce upload resilient."""
+    try:
+        from services.revo_bot_service import get_revo_bot_service
+        return get_revo_bot_service().notify_dataframe_moves(
+            df,
+            source=source,
+            live_map_url=live_map_url
+        )
+    except Exception as exc:
+        return {
+            'enabled': False,
+            'error': f'Failed to notify Revo Bot: {str(exc)}'
+        }
+
+
 def get_rotaer_processor():
     """Get or create ROTAER processor instance"""
     global _rotaer_processor
@@ -81,11 +105,17 @@ def upload_salesforce():
         result = processor.process(filepath)
         
         if result['success']:
+            revo_bot_result = _notify_revo_bot_for_moves(
+                processor.df,
+                source='salesforce_upload',
+                live_map_url=_build_live_map_url()
+            )
             return jsonify({
                 'success': True,
                 'message': 'Salesforce report processed successfully',
                 'total_records': result['total_records'],
-                'total_revenue': result['total_revenue']
+                'total_revenue': result['total_revenue'],
+                'revo_bot': revo_bot_result
             })
         else:
             return jsonify({'error': result.get('error', 'Processing failed')}), 400
