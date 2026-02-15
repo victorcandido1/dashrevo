@@ -1,0 +1,13 @@
+.git
+.gitignore
+.env
+.env.*
+*.log
+__pycache__/
+*.pyc
+*.md
+scripts/
+*.bak
+.cache/
+tracker-app.zip
+*.backup

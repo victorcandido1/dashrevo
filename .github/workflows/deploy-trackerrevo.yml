@@ -1,0 +1,64 @@
+# Deploy Tracker REVO para Google Cloud Run
+# Mesmo fluxo do ipmet: push no GitHub dispara deploy automático
+
+name: Deploy Tracker REVO
+
+on:
+  push:
+    branches: [main, claude/setup-plane-notify-inr9r]
+    paths:
+      - 'trackerrevo/**'
+      - '.github/workflows/deploy-trackerrevo.yml'
+  workflow_dispatch:
+
+env:
+  PROJECT_ID: codigos-465200
+  REGION: southamerica-east1
+  SERVICE_NAME: trackerrevo
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+        # Se usar Workload Identity (como ipmet): use workload_identity_provider e service_account
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ env.SERVICE_NAME }}
+          source: ./trackerrevo
+          region: ${{ env.REGION }}
+          project_id: ${{ env.PROJECT_ID }}
+          flags: >-
+            --memory=512Mi
+            --cpu=1
+            --min-instances=0
+            --max-instances=5
+            --timeout=120
+            --allow-unauthenticated
+            --set-env-vars=TZ=America/Sao_Paulo,PYTHONUNBUFFERED=1
+
+      - name: Output URL
+        run: |
+          echo "=========================================="
+          echo "Tracker REVO deployed!"
+          echo "URL: ${{ steps.deploy.outputs.url }}"
+          echo "  /       - Dashboard"
+          echo "  /tracker - Radar de aeronaves"
+          echo "=========================================="

@@ -1,0 +1,16 @@
+# Cloud Build - Tracker REVO
+# Mesmo padrao ipmet: gcr.io/$PROJECT_ID/trackerrevo
+
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/trackerrevo'
+      - '.'
+
+images:
+  - 'gcr.io/$PROJECT_ID/trackerrevo'
+
+options:
+  logging: CLOUD_LOGGING_ONLY

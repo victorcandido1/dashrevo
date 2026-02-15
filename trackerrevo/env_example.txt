@@ -1,0 +1,5 @@
+# Tracker REVO - Variaveis de ambiente (opcional)
+# Copie para .env e preencha. Nao commitar .env
+
+# Flask (produção)
+SECRET_KEY=sua-chave-secreta-aleatoria
