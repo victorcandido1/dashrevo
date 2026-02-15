@@ -14,6 +14,18 @@ from datetime import datetime
 upload_bp = Blueprint('upload', __name__)
 
 
+def _notify_revo_bot_for_moves(df, source):
+    """Notify Revo Bot without breaking upload flow on errors."""
+    try:
+        from services.revo_bot_service import get_revo_bot_service
+        return get_revo_bot_service().notify_dataframe_moves(df, source=source)
+    except Exception as exc:
+        return {
+            'enabled': False,
+            'error': f'Failed to notify Revo Bot: {str(exc)}'
+        }
+
+
 @upload_bp.route('/upload', methods=['POST'])
 def upload_file():
     """Handle file upload"""
@@ -61,6 +73,12 @@ def upload_file():
             from services.cache_service import get_cache_service
             cache = get_cache_service()
             cache_saved = cache.save_processor_state(processor)
+
+            # Notify aircraft moves to Revo Bot (if configured)
+            revo_bot_result = _notify_revo_bot_for_moves(
+                processor.df_filtered,
+                source='dashboard_upload'
+            )
             
             # Store in session
             session['file_path'] = str(filepath)  # Convert Path to string for session
@@ -78,7 +96,8 @@ def upload_file():
                     'coverage_percent': distance_stats.get('coverage', 0),
                     'missing_codes': distance_stats.get('missing_codes', [])
                 },
-                'cache_saved': cache_saved
+                'cache_saved': cache_saved,
+                'revo_bot': revo_bot_result
             })
         except FileNotFoundError as e:
             import traceback
@@ -396,6 +415,12 @@ def upload_november_data():
             from services.cache_service import get_cache_service
             cache = get_cache_service()
             cache_saved = cache.save_processor_state(processor)
+
+            # Notify aircraft moves to Revo Bot (if configured)
+            revo_bot_result = _notify_revo_bot_for_moves(
+                processor.df_filtered,
+                source='november_upload'
+            )
             
             # Store in session
             session['file_path'] = str(filepath)
@@ -443,7 +468,8 @@ def upload_november_data():
                 'november_in_base': november_in_base,
                 'month_distribution': month_distribution,
                 'data_preserved': final_count_all >= (existing_count + len(df_november)) if existing_count > 0 else True,
-                'cache_saved': cache_saved
+                'cache_saved': cache_saved,
+                'revo_bot': revo_bot_result
             })
         except Exception as e:
             import traceback
