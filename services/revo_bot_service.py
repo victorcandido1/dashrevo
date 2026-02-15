@@ -19,6 +19,7 @@ class RevoBotService:
     def __init__(self):
         self.webhook_url = os.environ.get('REVO_BOT_WEBHOOK_URL', '').strip()
         self.token = os.environ.get('REVO_BOT_TOKEN', '').strip()
+        self.live_map_url = os.environ.get('REVO_BOT_LIVE_MAP_URL', '').strip()
         self.timeout_seconds = self._read_int_env('REVO_BOT_TIMEOUT_SECONDS', 10, minimum=1)
         self.max_moves_per_run = self._read_int_env('REVO_BOT_MAX_MOVES_PER_RUN', 200, minimum=1)
         self.enabled = self._is_enabled()
@@ -122,7 +123,13 @@ class RevoBotService:
         ]
         return '|'.join(part.strip().upper() for part in parts)
 
-    def _format_message(self, move):
+    def _resolve_live_map_url(self, live_map_url=None):
+        """Resolve live map URL from parameter or environment."""
+        if isinstance(live_map_url, str) and live_map_url.strip():
+            return live_map_url.strip()
+        return self.live_map_url
+
+    def _format_message(self, move, live_map_url=''):
         """Build human-readable message sent to Revo Bot."""
         prefix = move.get('prefix') or move.get('model') or 'UNKNOWN_AIRCRAFT'
         origin = move.get('origin') or 'UNKNOWN_ORIGIN'
@@ -138,7 +145,10 @@ class RevoBotService:
         else:
             movement_time = 'UNKNOWN_TIME'
 
-        return f"{prefix} moved from {origin} to {destination} at {movement_time}"
+        base_message = f"{prefix} moved from {origin} to {destination} at {movement_time}"
+        if live_map_url:
+            return f"{base_message}\nLive map: {live_map_url}"
+        return base_message
 
     def _send_payload(self, payload):
         """Send one webhook call to Revo Bot."""
@@ -220,8 +230,9 @@ class RevoBotService:
 
         return list(deduped.values())
 
-    def notify_moves(self, moves):
+    def notify_moves(self, moves, live_map_url=None):
         """Notify Revo Bot for new aircraft movements."""
+        resolved_live_map_url = self._resolve_live_map_url(live_map_url)
         detected_moves = len(moves)
         if detected_moves == 0:
             return {
@@ -231,7 +242,8 @@ class RevoBotService:
                 'sent': 0,
                 'failed': 0,
                 'already_sent': 0,
-                'skipped_by_limit': 0
+                'skipped_by_limit': 0,
+                'live_map_url': resolved_live_map_url
             }
 
         if not self.enabled:
@@ -243,6 +255,7 @@ class RevoBotService:
                 'failed': 0,
                 'already_sent': detected_moves,
                 'skipped_by_limit': 0,
+                'live_map_url': resolved_live_map_url,
                 'reason': 'Revo Bot disabled or missing REVO_BOT_WEBHOOK_URL'
             }
 
@@ -264,7 +277,7 @@ class RevoBotService:
         for move in to_send:
             payload = {
                 'event': 'aircraft_move',
-                'message': self._format_message(move),
+                'message': self._format_message(move, resolved_live_map_url),
                 'aircraft_move': {
                     'source': move.get('source', ''),
                     'prefix': move.get('prefix', ''),
@@ -273,7 +286,8 @@ class RevoBotService:
                     'destination': move.get('destination', ''),
                     'flight_number': move.get('flight_number', ''),
                     'movement_time': move.get('movement_time', ''),
-                    'move_id': move.get('move_id', '')
+                    'move_id': move.get('move_id', ''),
+                    'live_map_url': resolved_live_map_url
                 }
             }
 
@@ -300,7 +314,8 @@ class RevoBotService:
             'sent': sent_count,
             'failed': failed_count,
             'already_sent': already_sent,
-            'skipped_by_limit': skipped_by_limit
+            'skipped_by_limit': skipped_by_limit,
+            'live_map_url': resolved_live_map_url
         }
 
         if failures:
@@ -308,10 +323,10 @@ class RevoBotService:
 
         return result
 
-    def notify_dataframe_moves(self, df, source='unknown'):
+    def notify_dataframe_moves(self, df, source='unknown', live_map_url=None):
         """Extract and notify movement events from a dataframe."""
         moves = self.extract_moves(df, source=source)
-        return self.notify_moves(moves)
+        return self.notify_moves(moves, live_map_url=live_map_url)
 
 
 _revo_bot_service = None
