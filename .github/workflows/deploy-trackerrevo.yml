@@ -34,7 +34,7 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Deploy to Cloud Run
+      - name: Build and Deploy to Cloud Run
         id: deploy
         uses: google-github-actions/deploy-cloudrun@v2
         with:
@@ -55,7 +55,12 @@ jobs:
         run: |
           echo "=========================================="
           echo "Tracker REVO deployed!"
-          echo "URL: ${{ steps.deploy.outputs.url }}"
-          echo "  /       - Dashboard"
-          echo "  /radar  - Radar (ou /tracker)"
+          URL="${{ steps.deploy.outputs.url }}"
+          echo "URL base: $URL"
+          echo ""
+          echo "Rotas (teste em ordem):"
+          echo "  1. $URL/health  - Health check (deve retornar OK)"
+          echo "  2. $URL/radar   - Radar de aeronaves"
+          echo "  3. $URL/tracker - Radar (alias)"
+          echo "  4. $URL/        - Dashboard"
           echo "=========================================="

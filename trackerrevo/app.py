@@ -2,7 +2,7 @@
 Flight Dashboard Web Application
 Main Flask application entry point
 """
-from flask import Flask, render_template, session
+from flask import Flask, render_template, session, jsonify
 from config import Config
 from routes.api import api_bp, set_data_processor, get_data_processor
 from routes.upload import upload_bp
@@ -48,6 +48,12 @@ def load_cache_if_needed():
                     set_data_processor(processor)
         except Exception as e:
             pass  # Silently fail, will try again on next request
+
+
+@app.route('/health')
+def health():
+    """Health check para Cloud Run"""
+    return jsonify({'status': 'ok', 'service': 'trackerrevo'}), 200
 
 
 @app.route('/')

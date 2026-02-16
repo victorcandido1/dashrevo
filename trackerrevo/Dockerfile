@@ -16,4 +16,5 @@ EXPOSE 8080
 # Diretórios para cache de movimento e uploads
 RUN mkdir -p .cache uploads
 
-CMD exec gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+# Shell form para expandir $PORT (Cloud Run injeta PORT=8080)
+CMD gunicorn app:app --bind 0.0.0.0:${PORT:-8080} --workers 1 --threads 4 --timeout 120
