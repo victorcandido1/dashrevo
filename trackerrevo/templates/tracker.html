@@ -397,7 +397,6 @@
 <div id="topbar">
     <div class="left">
         <a href="/" class="back-link">&larr; Início</a>
-        <a href="/historico" class="back-link" style="margin-left:8px;">Histórico</a>
         <div class="title">RADAR AO VIVO</div>
         <div class="stats">
             <span class="status-dot loading" id="status-dot"></span>
@@ -406,6 +405,7 @@
         </div>
     </div>
     <div class="right">
+        <button class="btn" onclick="location.href='/historico'">Histórico</button>
         <button class="btn active" id="btn-sound" onclick="toggleSound()">Som ON</button>
         <button class="btn" id="btn-notif" onclick="requestNotifications()">Notif.</button>
         <button class="btn" onclick="refreshNow()">Atualizar</button>
