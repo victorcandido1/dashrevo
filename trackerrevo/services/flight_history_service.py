@@ -12,7 +12,7 @@ from collections import defaultdict
 from datetime import datetime
 
 # Histórico: icao24 -> lista de posições [{lat, lon, alt, velocity_kt, ...}, ...]
-# Salvar apenas aeronaves rastreadas: PR-OOE, PR-OMB, PR-OMH
+# Salvar aeronaves rastreadas: PR-OOE, PR-OMB, PR-OMH e todos os helicópteros (categoria 8)
 TRACKED_REGISTRATIONS = frozenset({'PROOE', 'PROMB', 'PROMH'})
 MAX_POINTS_PER_AIRCRAFT = 1800  # ~30 min a 1 pt/sec
 MAX_AGE_SECONDS = 1800  # 30 min
@@ -45,7 +45,7 @@ class FlightHistoryService:
         """Retorna True se aeronave/pontos são de PR-OOE, PR-OMB ou PR-OMH"""
         if isinstance(ac_or_points, dict):
             reg = (ac_or_points.get('registration') or ac_or_points.get('callsign') or '').upper().replace('-', '')
-            return reg in TRACKED_REGISTRATIONS or ac_or_points.get('is_tracked')
+            return reg in TRACKED_REGISTRATIONS or ac_or_points.get('is_tracked')  # is_tracked = helicópteros
         if isinstance(ac_or_points, list):
             return any(FlightHistoryService._is_tracked(p) for p in ac_or_points)
         return False

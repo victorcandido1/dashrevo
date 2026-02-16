@@ -1,12 +1,16 @@
 """
 OpenSky Network API Service
 Provides real-time ADS-B aircraft data for the tracker
+Com fallback em adsb.lol para aeronaves não vistas pelo OpenSky
 """
 import urllib.request
 import urllib.error
 import json
 import time
+import logging
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 # São Paulo / Southeast Brazil region bounding box (wide enough to catch approaches)
 SAO_PAULO_BOUNDS = {
@@ -78,13 +82,8 @@ class OpenSkyService:
                 data = json.loads(response.read().decode('utf-8'))
 
             if not data or not data.get('states'):
-                return {
-                    'aircraft': [],
-                    'time': int(time.time()),
-                    'total': 0,
-                    'tracked_events': [],
-                    'tracked_aircraft': self._get_tracked_summary()
-                }
+                # OpenSky vazio: tenta adsb.lol como fallback para nossas 3 aeronaves
+                return self._response_with_fallback_only()
 
             aircraft_list = []
             tracked_events = []
@@ -97,6 +96,20 @@ class OpenSkyService:
                     # Check for tracked aircraft events
                     events = self._check_tracked_aircraft(aircraft)
                     tracked_events.extend(events)
+
+            # Fallback: adsb.lol para aeronaves rastreadas que OpenSky não retornou
+            icao_seen = {a['icao24'] for a in aircraft_list}
+            try:
+                from services.adsb_lol_service import fetch_tracked_fallback
+                fallback_ac = fetch_tracked_fallback(bounds=self.bounds)
+                for ac in fallback_ac:
+                    if ac and ac.get('icao24') and ac['icao24'] not in icao_seen:
+                        aircraft_list.append(ac)
+                        icao_seen.add(ac['icao24'])
+                        events = self._check_tracked_aircraft(ac)
+                        tracked_events.extend(events)
+            except Exception as e:
+                logger.debug("adsb.lol fallback: %s", e)
 
             # Clean up stale states
             self._cleanup_stale()
@@ -116,32 +129,41 @@ class OpenSkyService:
 
         except urllib.error.HTTPError as e:
             if e.code == 429:
-                return {
-                    'error': 'Limite de requisições excedido. Aguarde alguns segundos.',
-                    'aircraft': [],
-                    'total': 0,
-                    'tracked_events': [],
-                    'tracked_aircraft': self._get_tracked_summary()
-                }
-            return {
-                'error': f'Erro na API: {e.code}',
-                'aircraft': [],
-                'total': 0,
-                'tracked_events': [],
-                'tracked_aircraft': self._get_tracked_summary()
-            }
+                resp = self._response_with_fallback_only()
+                resp['error'] = 'Limite de requisições excedido. Aguarde alguns segundos.'
+                return resp
+            resp = self._response_with_fallback_only()
+            resp['error'] = f'Erro na API: {e.code}'
+            return resp
         except Exception as e:
-            return {
-                'error': str(e),
-                'aircraft': [],
-                'total': 0,
-                'tracked_events': [],
-                'tracked_aircraft': self._get_tracked_summary()
-            }
+            resp = self._response_with_fallback_only()
+            resp['error'] = str(e)
+            return resp
 
     def get_event_log(self):
         """Return recent event log"""
         return list(self._event_log)
+
+    def _response_with_fallback_only(self):
+        """Quando OpenSky falha/vazio: usa apenas adsb.lol para nossas 3 aeronaves"""
+        aircraft_list = []
+        tracked_events = []
+        try:
+            from services.adsb_lol_service import fetch_tracked_fallback
+            aircraft_list = fetch_tracked_fallback(bounds=self.bounds)
+            for ac in aircraft_list:
+                if ac:
+                    events = self._check_tracked_aircraft(ac)
+                    tracked_events.extend(events)
+        except Exception as e:
+            logger.debug("adsb.lol fallback (full): %s", e)
+        return {
+            'aircraft': aircraft_list,
+            'time': int(time.time()),
+            'total': len(aircraft_list),
+            'tracked_events': tracked_events,
+            'tracked_aircraft': self._get_tracked_summary()
+        }
 
     def _parse_state_vector(self, state):
         """Parse an OpenSky state vector array into a dict"""
@@ -156,8 +178,10 @@ class OpenSkyService:
             return None
 
         callsign = (state[1] or '').strip()
+        category = state[17] if len(state) > 17 else None
+        is_rotorcraft = (category == 8)
 
-        # Determine if this is a tracked aircraft
+        # Tracked: nossos 3 OU qualquer helicóptero (categoria 8 - Rotorcraft)
         is_tracked = False
         registration = None
         for reg, patterns in self.tracked.items():
@@ -167,16 +191,18 @@ class OpenSkyService:
                 is_tracked = True
                 registration = reg
                 break
+        if not is_tracked and is_rotorcraft:
+            is_tracked = True
+            registration = callsign or f"HELI-{state[0]}"
 
         velocity_ms = state[9]
         velocity_kt = round(velocity_ms * 1.94384, 1) if velocity_ms is not None else None
         altitude_m = state[7]
         altitude_ft = round(altitude_m * 3.28084) if altitude_m is not None else None
-        category = state[17] if len(state) > 17 else None
-        # Helicopter: our tracked aircraft OR rotorcraft (8) / high-perf (7)
+        # Helicopter: nossos 3 ou rotorcraft (categoria 8)
         is_helicopter = is_tracked or category in (7, 8)
 
-        model = HELICOPTER_MODELS.get(registration) if registration else None
+        model = HELICOPTER_MODELS.get(registration) if registration in HELICOPTER_MODELS else None
         return {
             'icao24': state[0],
             'callsign': callsign,

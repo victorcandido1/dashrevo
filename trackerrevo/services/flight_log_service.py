@@ -13,7 +13,7 @@ import math
 MAX_FLIGHTS = 500
 LOG_FILENAME = 'flight_log.json'
 GCS_BLOB = 'cache/flight_log.json'
-# Guardar apenas voos destas aeronaves
+# Guardar voos: nossos 3 + todos os helicópteros (o filtro é feito pelo tracker que só envia is_tracked)
 TRACKED_REGISTRATIONS = frozenset({'PR-OOE', 'PR-OMB', 'PR-OMH', 'PROOE', 'PROMB', 'PROMH'})
 
 # Aeroportos para inferir origem/destino (nearest)
@@ -118,8 +118,9 @@ class FlightLogService:
         route_points: lista de dicts com lat, lon, alt, velocity_kt, heading, ts, etc.
         Aceita também route como [[lat,lon],...] para retrocompatibilidade.
         """
+        # Salva todos os voos do tracker (nossos 3 + todos helicópteros categoria 8)
         reg_norm = (registration or '').upper().replace('-', '').strip()
-        if reg_norm not in TRACKED_REGISTRATIONS:
+        if not reg_norm:
             return None
         if not route_points or len(route_points) < 2:
             return None
