@@ -34,33 +34,34 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Build and Deploy to Cloud Run
-        id: deploy
-        uses: google-github-actions/deploy-cloudrun@v2
-        with:
-          service: ${{ env.SERVICE_NAME }}
-          source: ./trackerrevo
-          region: ${{ env.REGION }}
-          project_id: ${{ env.PROJECT_ID }}
-          flags: >-
-            --memory=512Mi
-            --cpu=1
-            --min-instances=0
-            --max-instances=5
-            --timeout=120
-            --allow-unauthenticated
-            --set-env-vars=TZ=America/Sao_Paulo,PYTHONUNBUFFERED=1,GCS_BUCKET=trackerrevo-cache
+      - name: Build Docker image
+        run: |
+          gcloud builds submit --tag gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }} ./trackerrevo --project=${{ env.PROJECT_ID }}
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --memory 512Mi \
+            --cpu 1 \
+            --min-instances 0 \
+            --max-instances 5 \
+            --timeout 120 \
+            --allow-unauthenticated \
+            --set-env-vars TZ=America/Sao_Paulo,PYTHONUNBUFFERED=1,GCS_BUCKET=trackerrevo-cache \
+            --project ${{ env.PROJECT_ID }}
 
       - name: Output URL
         run: |
+          URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region ${{ env.REGION }} --project ${{ env.PROJECT_ID }} --format 'value(status.url)')
           echo "=========================================="
           echo "Tracker REVO deployed!"
-          URL="${{ steps.deploy.outputs.url }}"
-          echo "URL base: $URL"
+          echo "URL: $URL"
           echo ""
-          echo "Rotas (teste em ordem):"
-          echo "  1. $URL/health  - Health check (deve retornar OK)"
-          echo "  2. $URL/radar   - Radar de aeronaves"
-          echo "  3. $URL/tracker - Radar (alias)"
-          echo "  4. $URL/        - Dashboard"
+          echo ""
+          echo "Teste estes links:"
+          echo "  Health: $URL/health"
+          echo "  Radar:  $URL/radar"
           echo "=========================================="
