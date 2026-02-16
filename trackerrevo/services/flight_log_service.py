@@ -13,6 +13,8 @@ import math
 MAX_FLIGHTS = 500
 LOG_FILENAME = 'flight_log.json'
 GCS_BLOB = 'cache/flight_log.json'
+# Guardar apenas voos destas aeronaves
+TRACKED_REGISTRATIONS = frozenset({'PR-OOE', 'PR-OMB', 'PR-OMH', 'PROOE', 'PROMB', 'PROMH'})
 
 # Aeroportos para inferir origem/destino (nearest)
 _AIRPORTS = [
@@ -111,11 +113,14 @@ class FlightLogService:
 
     def save_flight(self, event_type, registration, icao24, route_points, time_iso=None, **extra):
         """
-        Salva um voo completado.
+        Salva um voo completado (apenas PR-OOE, PR-OMB, PR-OMH).
         event_type: 'landing' | 'takeoff'
         route_points: lista de dicts com lat, lon, alt, velocity_kt, heading, ts, etc.
         Aceita também route como [[lat,lon],...] para retrocompatibilidade.
         """
+        reg_norm = (registration or '').upper().replace('-', '').strip()
+        if reg_norm not in TRACKED_REGISTRATIONS:
+            return None
         if not route_points or len(route_points) < 2:
             return None
         if isinstance(route_points[0], (list, tuple)):

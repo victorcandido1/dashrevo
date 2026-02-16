@@ -12,6 +12,8 @@ from collections import defaultdict
 from datetime import datetime
 
 # Histórico: icao24 -> lista de posições [{lat, lon, alt, velocity_kt, ...}, ...]
+# Salvar apenas aeronaves rastreadas: PR-OOE, PR-OMB, PR-OMH
+TRACKED_REGISTRATIONS = frozenset({'PROOE', 'PROMB', 'PROMH'})
 MAX_POINTS_PER_AIRCRAFT = 1800  # ~30 min a 1 pt/sec
 MAX_AGE_SECONDS = 1800  # 30 min
 MIN_INTERVAL_SEC = 1  # mínimo 1 segundo entre pontos
@@ -38,15 +40,25 @@ class FlightHistoryService:
         self._use_gcs = bool(os.environ.get('K_SERVICE') or os.environ.get('GOOGLE_CLOUD_PROJECT'))
         self._load_from_file()
 
+    @staticmethod
+    def _is_tracked(ac_or_points):
+        """Retorna True se aeronave/pontos são de PR-OOE, PR-OMB ou PR-OMH"""
+        if isinstance(ac_or_points, dict):
+            reg = (ac_or_points.get('registration') or ac_or_points.get('callsign') or '').upper().replace('-', '')
+            return reg in TRACKED_REGISTRATIONS or ac_or_points.get('is_tracked')
+        if isinstance(ac_or_points, list):
+            return any(FlightHistoryService._is_tracked(p) for p in ac_or_points)
+        return False
+
     def _load_from_file(self):
-        """Carrega histórico do arquivo cache ou GCS"""
+        """Carrega histórico do arquivo cache ou GCS (apenas PR-OOE, PR-OMB, PR-OMH)"""
         if self._use_gcs:
             try:
                 from .gcs_storage import gcs_read_json
                 data = gcs_read_json(GCS_BLOB)
                 if data:
                     for icao24, points in data.get('aircraft', {}).items():
-                        if isinstance(points, list):
+                        if isinstance(points, list) and self._is_tracked(points):
                             self._history[icao24] = points
                     self._last_update = data.get('_meta', {}).get('last_update', 0)
                     self._prune_old()
@@ -59,7 +71,7 @@ class FlightHistoryService:
             with open(self._cache_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             for icao24, points in data.get('aircraft', {}).items():
-                if isinstance(points, list):
+                if isinstance(points, list) and self._is_tracked(points):
                     self._history[icao24] = points
             self._last_update = data.get('_meta', {}).get('last_update', 0)
             self._prune_old()
@@ -67,16 +79,17 @@ class FlightHistoryService:
             pass
 
     def _save_to_file(self):
-        """Salva histórico no arquivo cache ou GCS"""
+        """Salva histórico no arquivo cache ou GCS (apenas PR-OOE, PR-OMB, PR-OMH)"""
         try:
             self._prune_old()
+            tracked_only = {k: v for k, v in self._history.items() if self._is_tracked(v)}
             data = {
-                'aircraft': dict(self._history),
+                'aircraft': tracked_only,
                 '_meta': {
                     'last_update': self._last_update,
                     'saved_at': datetime.now().isoformat(),
-                    'aircraft_count': len(self._history),
-                    'total_points': sum(len(p) for p in self._history.values()),
+                    'aircraft_count': len(tracked_only),
+                    'total_points': sum(len(p) for p in tracked_only.values()),
                 }
             }
             if self._use_gcs:
@@ -102,6 +115,8 @@ class FlightHistoryService:
         for ac in aircraft_list:
             if not ac or ac.get('latitude') is None or ac.get('longitude') is None:
                 continue
+            if not self._is_tracked(ac):
+                continue  # Guardar apenas PR-OOE, PR-OMB, PR-OMH
 
             icao24 = ac.get('icao24', 'unknown')
             history = self._history[icao24]

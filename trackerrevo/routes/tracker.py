@@ -439,6 +439,12 @@ def tracker_page():
     return render_template('tracker.html')
 
 
+@tracker_bp.route('/historico')
+def history_page():
+    """Página de histórico de voos - visualizar rotas no mapa"""
+    return render_template('history.html')
+
+
 @tracker_bp.route('/api/tracker/aircraft')
 def get_aircraft():
     """Get all aircraft in the monitored region + flight trails from cache"""

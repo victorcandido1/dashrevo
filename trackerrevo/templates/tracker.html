@@ -396,7 +396,8 @@
 <!-- Top Bar -->
 <div id="topbar">
     <div class="left">
-        <a href="/" class="back-link">&larr; Dashboard</a>
+        <a href="/" class="back-link">&larr; Início</a>
+        <a href="/historico" class="back-link" style="margin-left:8px;">Histórico</a>
         <div class="title">RADAR AO VIVO</div>
         <div class="stats">
             <span class="status-dot loading" id="status-dot"></span>
@@ -435,7 +436,7 @@
 
 <!-- Events Panel -->
 <div id="events-panel">
-    <div class="panel-header">EVENTOS</div>
+    <div class="panel-header">EVENTOS E HISTÓRICO</div>
     <div id="events-list">
         <div class="no-events">Aguardando eventos de aeronaves rastreadas...</div>
     </div>
@@ -1091,6 +1092,7 @@
                     loadFlightHistory();
                     fetchAircraft();
                     refreshTimer = setInterval(fetchAircraft, CONFIG.refresh_interval * 1000);
+                    setInterval(loadFlightHistory, 120000);
 
                     if ('Notification' in window && Notification.permission === 'granted') {
                         var btn = document.getElementById('btn-notif');
