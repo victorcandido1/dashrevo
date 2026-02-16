@@ -560,8 +560,9 @@
             zoomControl: true
         });
 
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors',
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap &copy; CARTO',
+            subdomains: 'abcd',
             maxZoom: 19
         }).addTo(map);
 
@@ -595,26 +596,29 @@
         });
     }
 
-    // ===== Aircraft Icon (EC155/EC135 do ipmet) =====
+    // ===== Aircraft Icon (aviao.png + EC155/EC135) =====
     var ICON_BASE = '{{ url_for("static", filename="icons/") }}';
     function createAircraftIcon(heading, isTracked, onGround, model) {
         var rotation = (heading != null) ? heading : 0;
-        var size = isTracked ? 32 : 20;
-        var opacity = isTracked ? 1.0 : 0.7;
-        var iconName = (model === 'EC155' || model === 'EC135') ? model.toLowerCase() : null;
+        var size = isTracked ? 32 : 24;
+        var opacity = isTracked ? 1.0 : 0.8;
+        var helicopterIcon = (model === 'EC155' || model === 'EC135') ? model.toLowerCase() : null;
+        var useAviao = true;
         var html;
-        if (iconName && isTracked) {
-            var src = ICON_BASE + iconName + '.png';
-            html = '<img src="' + src + '" width="' + size + '" height="' + size + '" ' +
-                'style="transform:rotate(' + rotation + 'deg);opacity:' + opacity + ';object-fit:contain;" ' +
+        if (helicopterIcon && isTracked) {
+            var heliSrc = ICON_BASE + helicopterIcon + '.png';
+            html = '<img src="' + heliSrc + '" width="' + size + '" height="' + size + '" ' +
+                'style="transform:rotate(' + rotation + 'deg);opacity:' + opacity + ';object-fit:contain;filter:drop-shadow(0 0 3px rgba(255,255,255,0.5));" ' +
+                'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\'" />' +
+                '<img src="' + ICON_BASE + 'aviao.png" width="' + size + '" height="' + size + '" ' +
+                'style="display:none;transform:rotate(' + rotation + 'deg);opacity:' + opacity + ';object-fit:contain;filter:drop-shadow(0 0 3px rgba(255,255,255,0.5));" />';
+        } else {
+            var aviaoSrc = ICON_BASE + 'aviao.png';
+            html = '<img src="' + aviaoSrc + '" width="' + size + '" height="' + size + '" ' +
+                'style="transform:rotate(' + rotation + 'deg);opacity:' + opacity + ';object-fit:contain;filter:drop-shadow(0 0 3px rgba(255,255,255,0.5));" ' +
                 'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\'" />' +
                 '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" style="display:none;transform:rotate(' + rotation + 'deg);opacity:' + opacity + ';">' +
-                '<path d="M12 2 L10 9 L3 12 L10 13 L10 20 L8 22 L12 21 L16 22 L14 20 L14 13 L21 12 L14 9 Z" fill="' + (onGround ? '#f59e0b' : '#22c55e') + '"/>' +
-                '</svg>';
-        } else {
-            var color = isTracked ? (onGround ? '#f59e0b' : '#22c55e') : (onGround ? '#475569' : '#64748b');
-            html = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" style="transform:rotate(' + rotation + 'deg);opacity:' + opacity + ';">' +
-                '<path d="M12 2 L10 9 L3 12 L10 13 L10 20 L8 22 L12 21 L16 22 L14 20 L14 13 L21 12 L14 9 Z" fill="' + color + '"/>' +
+                '<path d="M12 2 L10 9 L3 12 L10 13 L10 20 L8 22 L12 21 L16 22 L14 20 L14 13 L21 12 L14 9 Z" fill="' + (isTracked ? (onGround ? '#f59e0b' : '#22c55e') : '#94a3b8') + '"/>' +
                 '</svg>';
         }
         return L.divIcon({
