@@ -467,6 +467,12 @@ def get_aircraft():
                     )
                     if fid:
                         ev['flight_id'] = fid
+        # Telegram revo_radar_bot (mesmo padrão de mensagens do outro bot)
+        try:
+            from services.telegram_radar_notifier import notify_events
+            notify_events(data.get('tracked_events', []), get_trail_fn=history.get_trail_full)
+        except Exception:
+            pass
     else:
         data['trails'] = {}
     return jsonify(data)
@@ -571,6 +577,11 @@ def internal_poll():
                         'landing', ev.get('registration', ''), ev.get('icao24', ''),
                         points, ev.get('time')
                     )
+        try:
+            from services.telegram_radar_notifier import notify_events
+            notify_events(data.get('tracked_events', []), get_trail_fn=history.get_trail_full)
+        except Exception:
+            pass
     return jsonify({'ok': True, 'aircraft': len(data.get('aircraft', []))})
 
 
