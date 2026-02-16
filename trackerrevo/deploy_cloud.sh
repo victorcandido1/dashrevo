@@ -37,7 +37,7 @@ gcloud run deploy ${SERVICE_NAME} \
     --max-instances 5 \
     --timeout 120 \
     --allow-unauthenticated \
-    --set-env-vars "TZ=America/Sao_Paulo,PYTHONUNBUFFERED=1" \
+    --set-env-vars "TZ=America/Sao_Paulo,PYTHONUNBUFFERED=1,GCS_BUCKET=trackerrevo-cache" \
     --project=${PROJECT_ID}
 
 echo "[3/3] Deploy concluído!"
@@ -47,5 +47,5 @@ echo "URL do Tracker REVO:"
 gcloud run services describe ${SERVICE_NAME} --region ${REGION} --format='value(status.url)' --project=${PROJECT_ID}
 echo "=========================================="
 echo ""
-echo "Rotas: /  (dashboard) | /tracker (radar)"
+echo "Rotas: /  (dashboard) | /radar ou /tracker (radar)"
 echo ""
