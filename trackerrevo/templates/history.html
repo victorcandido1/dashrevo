@@ -110,7 +110,7 @@
 <div id="map"></div>
 
 <div id="history-panel">
-    <div class="panel-header">Voos (PR-OMB, PR-OMH, PR-OOE)</div>
+    <div class="panel-header">Voos rastreados</div>
     <div id="flights-list">
         <div class="loading-msg">Carregando histórico...</div>
     </div>
@@ -181,7 +181,7 @@
                 var data = JSON.parse(xhr.responseText);
                 var flights = data.flights || [];
                 if (flights.length === 0) {
-                    list.innerHTML = '<div class="no-flights">Nenhum voo registrado ainda.<br><br>Os voos de PR-OMB, PR-OMH e PR-OOE são salvos automaticamente quando detectados no radar.</div>';
+                    list.innerHTML = '<div class="no-flights">Nenhum voo registrado ainda.<br><br>Os voos são salvos automaticamente ao detectar pouso no radar.</div>';
                     return;
                 }
                 var html = '';

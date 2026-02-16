@@ -463,6 +463,8 @@
 
     var map = null;
     var aircraftMarkers = {};
+    var trailLayers = {};
+    var trailLayerGroup = null;
     var airportMarkers = [];
     var boundsRect = null;
     var routeLayer = null;
@@ -575,11 +577,31 @@
         ).addTo(map);
 
         routeLayer = L.layerGroup().addTo(map);
+        trailLayerGroup = L.layerGroup().addTo(map);
 
         // Force a resize after a short delay to ensure proper rendering
         setTimeout(function() {
             map.invalidateSize();
         }, 200);
+    }
+
+    // ===== Trilhas tracejadas (desde a detecção) =====
+    function updateTrails(trails) {
+        if (!map || !trailLayerGroup || typeof L === 'undefined') return;
+        trailLayerGroup.clearLayers();
+        trailLayers = {};
+        if (!trails) return;
+        Object.keys(trails).forEach(function(icao24) {
+            var t = trails[icao24];
+            if (!t || !t.trail || t.trail.length < 2) return;
+            var poly = L.polyline(t.trail, {
+                color: '#00D4FF',
+                weight: 3,
+                opacity: 0.7,
+                dashArray: '8, 8'
+            });
+            trailLayerGroup.addLayer(poly);
+        });
     }
 
     function addAirports(airports) {
@@ -611,7 +633,8 @@
         var color = isTracked ? (onGround ? '#f59e0b' : '#22c55e') : '#94a3b8';
         var html;
         if (helicopterIcon && isTracked) {
-            var heliSrc = ICON_BASE + helicopterIcon + '.png';
+            // Nossos helicópteros (PR-OMB, PR-OMH, PR-OOE): ícone helicoptero.png
+            var heliSrc = ICON_BASE + 'helicoptero.png';
             html = '<img src="' + heliSrc + '" width="' + size + '" height="' + size + '" ' +
                 'style="transform:rotate(' + rotation + 'deg);opacity:' + opacity + ';object-fit:contain;filter:drop-shadow(0 0 3px rgba(255,255,255,0.5));" ' +
                 'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\'" />' +
@@ -992,6 +1015,7 @@
                     if (data.aircraft) updateAircraft(data.aircraft);
                     if (data.tracked_aircraft) updateTrackedPanel(data.tracked_aircraft);
                     if (data.tracked_events && data.tracked_events.length > 0) addEvents(data.tracked_events);
+                    if (data.trails) updateTrails(data.trails);
 
                 } catch(e) {
                     console.error('Parse error:', e);

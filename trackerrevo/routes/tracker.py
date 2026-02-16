@@ -554,13 +554,23 @@ def get_trails():
 
 @tracker_bp.route('/api/tracker/internal/poll')
 def internal_poll():
-    """Chamado pelo Cloud Scheduler a cada 5-10s para atualizar cache (GCP)"""
+    """Chamado pelo Cloud Scheduler a cada 1 min para atualizar cache (GCP)"""
     service = get_opensky_service()
     data = service.get_aircraft_in_region()
     if data.get('aircraft'):
         history = get_flight_history()
         history.add_positions(data['aircraft'])
         history.save_now()
+        # Processar pousos para salvar no flight_log (histórico persistente)
+        for ev in data.get('tracked_events', []):
+            if ev.get('type') == 'landing':
+                points = history.get_trail_full(ev.get('icao24', ''))
+                if points and len(points) >= 2:
+                    log_svc = get_flight_log()
+                    log_svc.save_flight(
+                        'landing', ev.get('registration', ''), ev.get('icao24', ''),
+                        points, ev.get('time')
+                    )
     return jsonify({'ok': True, 'aircraft': len(data.get('aircraft', []))})
 
 
