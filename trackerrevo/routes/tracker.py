@@ -229,7 +229,7 @@ body {
         bounds: {lamin:-25.0, lamax:-21.5, lomin:-48.5, lomax:-43.0},
         tracked: ['PR-OMB','PR-OMH','PR-OOE'],
         airports: [],
-        interval: 15,
+        interval: 1,
         center: {lat:-23.55, lon:-46.63}
     };
     var map=null, markers={}, trailLayers={}, boundsRect=null, timer=null, events=[], loading=false, sound=true, audioCtx=null;
@@ -571,7 +571,7 @@ def get_config():
         'bounds': SAO_PAULO_BOUNDS,
         'tracked_registrations': list(TRACKED_AIRCRAFT.keys()),
         'airports': AIRPORTS,
-        'refresh_interval': 10,
+        'refresh_interval': 1,
         'center': {
             'lat': -23.55,
             'lon': -46.63
