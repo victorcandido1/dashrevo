@@ -3,26 +3,20 @@ Aircraft Tracker Routes
 Real-time aircraft tracking with map visualization for São Paulo region
 """
 import os
-from flask import Blueprint, jsonify, Response
+from flask import Blueprint, jsonify, Response, render_template
 from services.opensky_service import (
     get_opensky_service,
     SAO_PAULO_BOUNDS,
     TRACKED_AIRCRAFT,
     AIRPORTS,
 )
+from services.flight_history_service import get_flight_history
+from services.flight_log_service import get_flight_log
 
 tracker_bp = Blueprint('tracker', __name__)
 
-# Cache the inline page
-_cached_page = None
-
-
 def _build_page():
-    """Build the tracker page with Leaflet inlined"""
-    global _cached_page
-    if _cached_page:
-        return _cached_page
-
+    """Build the tracker page with Leaflet inlined (sempre reconstrói para refletir alterações)"""
     # Read Leaflet files
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     leaflet_css = ''
@@ -43,9 +37,7 @@ def _build_page():
     except Exception:
         leaflet_js = '/* leaflet.js not found */'
 
-    html = _get_html(leaflet_css, leaflet_js)
-    _cached_page = html
-    return html
+    return _get_html(leaflet_css, leaflet_js)
 
 
 def _get_html(leaflet_css, leaflet_js):
@@ -177,7 +169,8 @@ body {
 .airport-label { background: rgba(15,23,42,0.8); border: 1px solid #334155; border-radius: 4px; padding: 2px 6px; font-size: 10px; font-weight: 600; color: #94a3b8; white-space: nowrap; }
 .back-link { color: #64748b; text-decoration: none; font-size: 12px; }
 .back-link:hover { color: #94a3b8; }
-.leaflet-div-icon { background: transparent; border: none; }
+.leaflet-div-icon { background: transparent !important; border: none !important; }
+.aircraft-icon.leaflet-div-icon { width: auto !important; height: auto !important; margin: 0 !important; }
 @media (max-width: 640px) { #tracked-panel { width: 200px; } #events-panel { width: calc(100% - 24px); } }
 </style>
 </head>
@@ -239,7 +232,7 @@ body {
         interval: 15,
         center: {lat:-23.55, lon:-46.63}
     };
-    var map=null, markers={}, boundsRect=null, timer=null, events=[], loading=false, sound=true, audioCtx=null;
+    var map=null, markers={}, trailLayers={}, boundsRect=null, timer=null, events=[], loading=false, sound=true, audioCtx=null;
     var LABELS = {takeoff:'DECOLAGEM', landing:'POUSO', detected:'DETECTADO', lost_signal:'SINAL PERDIDO'};
 
     function $(id){return document.getElementById(id);}
@@ -277,16 +270,43 @@ body {
         });
     }
 
-    function acIcon(hdg,tracked,ground){
-        var r=hdg||0,c=tracked?(ground?'#f59e0b':'#22c55e'):(ground?'#475569':'#64748b'),s=tracked?28:18,op=tracked?1:0.7,sw=tracked?1:0,st=tracked?'#fff':'none';
-        return L.divIcon({className:'aircraft-icon',html:'<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" style="transform:rotate('+r+'deg);opacity:'+op+';"><path d="M12 2 L10 9 L3 12 L10 13 L10 20 L8 22 L12 21 L16 22 L14 20 L14 13 L21 12 L14 9 Z" fill="'+c+'" stroke="'+st+'" stroke-width="'+sw+'"/></svg>',iconSize:[s,s],iconAnchor:[s/2,s/2]});
+    function acIcon(hdg,tracked,ground,isHelicopter){
+        var r=hdg||0;
+        var c,s;
+        if(tracked){
+            c='#00D4FF'; s=72;
+        }else{
+            c='#FACC15'; s=24;
+        }
+        var stroke=tracked?'#fff':'rgba(0,0,0,0.3)';
+        var sw=tracked?1.5:1;
+        var svg;
+        if(isHelicopter){
+            svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+s+'" height="'+s+'" viewBox="0 0 24 24" style="transform:rotate('+r+'deg)"><ellipse cx="12" cy="5" rx="8" ry="2" fill="'+c+'" stroke="'+stroke+'" stroke-width="'+sw+'"/><path d="M10 7 L14 7 L14 18 L10 18 Z" fill="'+c+'" stroke="'+stroke+'" stroke-width="'+sw+'"/><path d="M12 18 L12 21 M10 20 L14 20" stroke="'+stroke+'" stroke-width="'+sw+'" fill="none"/><circle cx="20" cy="12" r="1.5" fill="'+c+'" stroke="'+stroke+'"/></svg>';
+        }else{
+            svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+s+'" height="'+s+'" viewBox="0 0 24 24" style="transform:rotate('+r+'deg)"><path d="M12 2 L10 9 L3 12 L10 13 L10 20 L8 22 L12 21 L16 22 L14 20 L14 13 L21 12 L14 9 Z" fill="'+c+'" stroke="'+stroke+'" stroke-width="'+sw+'"/></svg>';
+        }
+        return L.divIcon({className:'aircraft-icon',html:svg,iconSize:[s,s],iconAnchor:[s/2,s/2]});
+    }
+
+    function updateTrails(trails){
+        if(!map)return;
+        Object.keys(trailLayers).forEach(function(k){if(trailLayers[k])map.removeLayer(trailLayers[k]);});
+        trailLayers={};
+        if(!trails)return;
+        Object.keys(trails).forEach(function(icao24){
+            var t=trails[icao24];
+            if(!t||!t.trail||t.trail.length<2)return;
+            var poly=L.polyline(t.trail,{color:'#00D4FF',weight:3,opacity:0.7,dashArray:'5,10'}).addTo(map);
+            trailLayers[icao24]=poly;
+        });
     }
 
     function updateMap(list){
         if(!map)return;var cur={};
         for(var i=0;i<list.length;i++){
             var a=list[i];if(!a.latitude||!a.longitude)continue;cur[a.icao24]=1;
-            var ic=acIcon(a.heading,a.is_tracked,a.on_ground);
+            var ic=acIcon(a.heading,a.is_tracked,a.on_ground,a.is_helicopter);
             if(markers[a.icao24]){markers[a.icao24].setLatLng([a.latitude,a.longitude]);markers[a.icao24].setIcon(ic);}
             else{markers[a.icao24]=L.marker([a.latitude,a.longitude],{icon:ic,zIndexOffset:a.is_tracked?1000:0}).addTo(map);}
             var reg=a.registration||a.callsign||a.icao24;
@@ -361,6 +381,7 @@ body {
                 var ce=$('aircraft-count');if(ce)ce.textContent=d.total||0;
                 var te=$('last-update');if(te)te.textContent=new Date().toLocaleTimeString('pt-BR');
                 if(d.aircraft)updateMap(d.aircraft);
+                if(d.trails)updateTrails(d.trails);
                 if(d.tracked_aircraft)updateTracked(d.tracked_aircraft);
                 if(d.tracked_events&&d.tracked_events.length)addEvts(d.tracked_events);
             }catch(e){if(dot)dot.className='status-dot offline';}}
@@ -410,28 +431,99 @@ body {
 </html>'''
 
 
+@tracker_bp.route('/radar')
 @tracker_bp.route('/tracker')
 @tracker_bp.route('/api/tracker/page')
 def tracker_page():
-    """Serve the self-contained tracker page"""
-    html = _build_page()
-    return Response(html, mimetype='text/html')
+    """Página do radar de aeronaves (ícones EC155/EC135 do ipmet)"""
+    return render_template('tracker.html')
 
 
 @tracker_bp.route('/api/tracker/aircraft')
 def get_aircraft():
-    """Get all aircraft in the monitored region"""
+    """Get all aircraft in the monitored region + flight trails from cache"""
     service = get_opensky_service()
     data = service.get_aircraft_in_region()
+    # Atualiza cache de memória dos voos
+    if data.get('aircraft'):
+        history = get_flight_history()
+        history.add_positions(data['aircraft'])
+        data['trails'] = history.get_tracked_trails()
+        # Ao detectar pouso, salva rota com telemetria no histórico persistente
+        for ev in data.get('tracked_events', []):
+            if ev.get('type') == 'landing':
+                points = history.get_trail_full(ev.get('icao24', ''))
+                if points and len(points) >= 2:
+                    log_svc = get_flight_log()
+                    fid = log_svc.save_flight(
+                        'landing', ev.get('registration', ''), ev.get('icao24', ''),
+                        points, ev.get('time')
+                    )
+                    if fid:
+                        ev['flight_id'] = fid
+    else:
+        data['trails'] = {}
     return jsonify(data)
 
 
 @tracker_bp.route('/api/tracker/events')
 def get_events():
-    """Get the event log"""
+    """Get the event log (recent in-memory events)"""
     service = get_opensky_service()
     events = service.get_event_log()
     return jsonify({'events': events})
+
+
+@tracker_bp.route('/api/tracker/flight-history')
+def get_flight_history_api():
+    """Lista histórico de voos salvos (com rotas)"""
+    log_svc = get_flight_log()
+    flights = log_svc.get_all(limit=100)
+    return jsonify({'flights': flights, 'stats': log_svc.get_stats()})
+
+
+@tracker_bp.route('/api/tracker/flight-route/<flight_id>')
+def get_flight_route(flight_id):
+    """Retorna rota de um voo por ID"""
+    log_svc = get_flight_log()
+    flight = log_svc.get_route(flight_id)
+    if not flight:
+        return jsonify({'error': 'Voo não encontrado'}), 404
+    return jsonify({
+        'id': flight['id'],
+        'registration': flight.get('registration'),
+        'type': flight.get('type'),
+        'time': flight.get('time'),
+        'route': flight.get('route', []),
+        'route_points': flight.get('route_points', []),
+        'takeoff': [flight.get('takeoff_lat'), flight.get('takeoff_lon')] if flight.get('takeoff_lat') else None,
+        'landing': [flight.get('landing_lat'), flight.get('landing_lon')] if flight.get('landing_lat') else None,
+        'origin_icao': flight.get('origin_icao'),
+        'destination_icao': flight.get('destination_icao'),
+        'avg_velocity_kt': flight.get('avg_velocity_kt'),
+    })
+
+
+@tracker_bp.route('/api/tracker/trails')
+def get_trails():
+    """Get flight trail history from cache"""
+    history = get_flight_history()
+    return jsonify({
+        'trails': history.get_tracked_trails(),
+        'stats': history.get_stats()
+    })
+
+
+@tracker_bp.route('/api/tracker/internal/poll')
+def internal_poll():
+    """Chamado pelo Cloud Scheduler a cada 5-10s para atualizar cache (GCP)"""
+    service = get_opensky_service()
+    data = service.get_aircraft_in_region()
+    if data.get('aircraft'):
+        history = get_flight_history()
+        history.add_positions(data['aircraft'])
+        history.save_now()
+    return jsonify({'ok': True, 'aircraft': len(data.get('aircraft', []))})
 
 
 @tracker_bp.route('/api/tracker/config')
@@ -441,7 +533,7 @@ def get_config():
         'bounds': SAO_PAULO_BOUNDS,
         'tracked_registrations': list(TRACKED_AIRCRAFT.keys()),
         'airports': AIRPORTS,
-        'refresh_interval': 15,
+        'refresh_interval': 10,
         'center': {
             'lat': -23.55,
             'lon': -46.63

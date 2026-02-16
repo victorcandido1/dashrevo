@@ -67,3 +67,50 @@ gcloud run deploy trackerrevo --image gcr.io/codigos-465200/trackerrevo \
 | weather-dashboard | Service | Dashboard meteorológico |
 
 Todos no projeto `codigos-465200`, região `southamerica-east1`.
+
+---
+
+## Deploy automático via GitHub
+
+Push em `main` dispara deploy automático (`.github/workflows/deploy-trackerrevo.yml`).
+
+1. Configure o secret `GCP_SA_KEY` no repositório (JSON da Service Account com permissão Cloud Run Admin e Storage).
+2. Push para `main` → deploy automático do trackerrevo.
+
+---
+
+## Persistência no Google Cloud (GCS)
+
+No Cloud Run o disco é efêmero. O trackerrevo usa **Google Cloud Storage** para persistir:
+
+- Cache de movimento das aeronaves
+- Histórico de voos (rotas, telemetria, origem/destino)
+
+**Criar o bucket:**
+```bash
+gsutil mb -p codigos-465200 -l southamerica-east1 gs://trackerrevo-cache
+gsutil iam ch serviceAccount:PROJECT_NUMBER-compute@developer.gserviceaccount.com:objectAdmin gs://trackerrevo-cache
+```
+
+(O Cloud Run usa a default compute SA; ajuste PROJECT_NUMBER.)
+
+Variável de ambiente no Cloud Run: `GCS_BUCKET=trackerrevo-cache` (já configurada no workflow).
+
+---
+
+## Amostragem e telemetria
+
+- **Throttle**: mínimo 1 segundo entre pontos armazenados
+- **Dados salvos**: rota (lat/lon), velocidade (kt), altitude (ft), heading, vertical_rate, timestamp
+- **Origem/destino**: inferidos pelo aeroporto mais próximo no primeiro/último ponto
+- **Velocidade média**: calculada ao salvar o voo
+
+Para amostragem mais frequente, use **Cloud Scheduler** chamando `/api/tracker/internal/poll` a cada 5–10 segundos.
+
+---
+
+## Ícones EC155 / EC135 (ipmet)
+
+Copie os ícones da pasta ipmet para `trackerrevo/static/icons/`:
+- `ec155.png` — PR-OMB, PR-OMH
+- `ec135.png` — PR-OOE

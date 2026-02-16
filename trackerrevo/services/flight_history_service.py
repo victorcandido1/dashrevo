@@ -1,20 +1,23 @@
 """
 Flight History / Memory Cache
 Guarda posições e trajetórias de aeronaves ao longo do tempo.
-Persiste em arquivo para manter histórico entre reinícios.
+Persiste em arquivo (ou GCS no Cloud Run) para manter histórico.
+Amostragem: mínimo 1 segundo entre pontos (throttle).
 """
 import time
 import json
+import os
 from pathlib import Path
 from collections import defaultdict
 from datetime import datetime
 
-# Histórico: icao24 -> lista de posições [{lat, lon, alt, ts, callsign, ...}, ...]
-# Mantém últimos 30 minutos (120 amostras a cada 15 seg)
-MAX_POINTS_PER_AIRCRAFT = 120
+# Histórico: icao24 -> lista de posições [{lat, lon, alt, velocity_kt, ...}, ...]
+MAX_POINTS_PER_AIRCRAFT = 1800  # ~30 min a 1 pt/sec
 MAX_AGE_SECONDS = 1800  # 30 min
+MIN_INTERVAL_SEC = 1  # mínimo 1 segundo entre pontos
 CACHE_FILENAME = 'aircraft_movement_cache.json'
-SAVE_INTERVAL = 60  # Salvar no disco a cada 60 segundos
+GCS_BLOB = 'cache/aircraft_movement_cache.json'
+SAVE_INTERVAL = 30  # Salvar no disco/GCS a cada 30 segundos
 
 
 class FlightHistoryService:
@@ -32,10 +35,24 @@ class FlightHistoryService:
                 cache_dir = Path(__file__).parent.parent / '.cache'
         self._cache_dir = Path(cache_dir)
         self._cache_file = self._cache_dir / CACHE_FILENAME
+        self._use_gcs = bool(os.environ.get('K_SERVICE') or os.environ.get('GOOGLE_CLOUD_PROJECT'))
         self._load_from_file()
 
     def _load_from_file(self):
-        """Carrega histórico do arquivo cache"""
+        """Carrega histórico do arquivo cache ou GCS"""
+        if self._use_gcs:
+            try:
+                from .gcs_storage import gcs_read_json
+                data = gcs_read_json(GCS_BLOB)
+                if data:
+                    for icao24, points in data.get('aircraft', {}).items():
+                        if isinstance(points, list):
+                            self._history[icao24] = points
+                    self._last_update = data.get('_meta', {}).get('last_update', 0)
+                    self._prune_old()
+            except Exception:
+                pass
+            return
         if not self._cache_file.exists():
             return
         try:
@@ -46,13 +63,12 @@ class FlightHistoryService:
                     self._history[icao24] = points
             self._last_update = data.get('_meta', {}).get('last_update', 0)
             self._prune_old()
-        except Exception as e:
+        except Exception:
             pass
 
     def _save_to_file(self):
-        """Salva histórico no arquivo cache"""
+        """Salva histórico no arquivo cache ou GCS"""
         try:
-            self._cache_dir.mkdir(parents=True, exist_ok=True)
             self._prune_old()
             data = {
                 'aircraft': dict(self._history),
@@ -63,10 +79,19 @@ class FlightHistoryService:
                     'total_points': sum(len(p) for p in self._history.values()),
                 }
             }
+            if self._use_gcs:
+                try:
+                    from .gcs_storage import gcs_write_json
+                    if gcs_write_json(GCS_BLOB, data):
+                        self._last_save = time.time()
+                except Exception:
+                    pass
+                return
+            self._cache_dir.mkdir(parents=True, exist_ok=True)
             with open(self._cache_file, 'w', encoding='utf-8') as f:
                 json.dump(data, f, indent=2, default=str)
             self._last_save = time.time()
-        except Exception as e:
+        except Exception:
             pass
 
     def add_positions(self, aircraft_list):
@@ -79,21 +104,24 @@ class FlightHistoryService:
                 continue
 
             icao24 = ac.get('icao24', 'unknown')
+            history = self._history[icao24]
+            last_ts = history[-1].get('ts_unix', 0) if history else 0
+            if now - last_ts < MIN_INTERVAL_SEC and history:
+                continue
             point = {
                 'lat': ac['latitude'],
                 'lon': ac['longitude'],
                 'alt': ac.get('altitude_ft'),
+                'velocity_kt': ac.get('velocity_kt'),
+                'heading': ac.get('heading'),
+                'vertical_rate': ac.get('vertical_rate'),
                 'ts': ts,
                 'ts_unix': now,
                 'callsign': ac.get('callsign', ''),
                 'registration': ac.get('registration'),
-                'velocity_kt': ac.get('velocity_kt'),
-                'heading': ac.get('heading'),
                 'on_ground': ac.get('on_ground', False),
                 'is_tracked': ac.get('is_tracked', False),
             }
-
-            history = self._history[icao24]
             history.append(point)
 
             # Manter apenas últimos N pontos
@@ -121,6 +149,10 @@ class FlightHistoryService:
         """Retorna trajetória (lista de [lat, lon]) para uma aeronave"""
         points = self._history.get(icao24, [])
         return [[p['lat'], p['lon']] for p in points]
+
+    def get_trail_full(self, icao24):
+        """Retorna pontos completos com telemetria (lat, lon, alt, velocity_kt, etc.)"""
+        return list(self._history.get(icao24, []))
 
     def get_full_history(self):
         """Retorna histórico completo para todas as aeronaves"""

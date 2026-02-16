@@ -23,6 +23,13 @@ TRACKED_AIRCRAFT = {
     'PR-OOE': ['PROOE', 'PROOE', 'PR-OOE', 'OOE'],
 }
 
+# Modelo do helicóptero por matrícula (ícones EC155 / EC135 do ipmet)
+HELICOPTER_MODELS = {
+    'PR-OMB': 'EC155',
+    'PR-OMH': 'EC155',
+    'PR-OOE': 'EC135',
+}
+
 # Major airports in the region for reference
 AIRPORTS = [
     {'icao': 'SBGR', 'name': 'Guarulhos Intl', 'lat': -23.4356, 'lon': -46.4731},
@@ -165,6 +172,11 @@ class OpenSkyService:
         altitude_m = state[7]
         altitude_ft = round(altitude_m * 3.28084) if altitude_m is not None else None
 
+        # Helicopter: our tracked aircraft OR OpenSky category 7
+        category = state[17] if len(state) > 17 else None
+        is_helicopter = is_tracked or category == 7
+
+        model = HELICOPTER_MODELS.get(registration) if registration else None
         return {
             'icao24': state[0],
             'callsign': callsign,
@@ -182,6 +194,8 @@ class OpenSkyService:
             'squawk': state[14],
             'is_tracked': is_tracked,
             'registration': registration,
+            'is_helicopter': is_helicopter,
+            'model': model,
             'last_contact': state[4],
         }
 

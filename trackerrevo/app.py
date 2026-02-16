@@ -11,10 +11,19 @@ from routes.salesforce import salesforce_bp
 from routes.tracker import tracker_bp
 import os
 
-app = Flask(__name__)
+# Ensure templates/static paths work when running from trackerrevo folder
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+app = Flask(__name__,
+    template_folder=os.path.join(BASE_DIR, 'templates'),
+    static_folder=os.path.join(BASE_DIR, 'static'))
 app.config.from_object(Config)
 Config.init_app(app)
 app.secret_key = Config.SECRET_KEY
+
+@app.context_processor
+def inject_now():
+    from datetime import datetime
+    return {'now': datetime.now}
 
 # Register blueprints
 app.register_blueprint(api_bp, url_prefix='/api')
@@ -53,8 +62,8 @@ if __name__ == '__main__':
     print("Flight Dashboard Web Application")
     print("="*60)
     
-    # Get port from environment (for production) or use default
-    port = int(os.environ.get('PORT', 5000))
+    # Get port from environment (for production) or use 5050 (macOS AirPlay often uses 5000)
+    port = int(os.environ.get('PORT', 5050))
     debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
     
     # Get local IP for network access

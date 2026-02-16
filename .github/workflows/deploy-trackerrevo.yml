@@ -5,10 +5,7 @@ name: Deploy Tracker REVO
 
 on:
   push:
-    branches: [main, claude/setup-plane-notify-inr9r]
-    paths:
-      - 'trackerrevo/**'
-      - '.github/workflows/deploy-trackerrevo.yml'
+    branches: [main]
   workflow_dispatch:
 
 env:
@@ -52,7 +49,7 @@ jobs:
             --max-instances=5
             --timeout=120
             --allow-unauthenticated
-            --set-env-vars=TZ=America/Sao_Paulo,PYTHONUNBUFFERED=1
+            --set-env-vars=TZ=America/Sao_Paulo,PYTHONUNBUFFERED=1,GCS_BUCKET=trackerrevo-cache
 
       - name: Output URL
         run: |

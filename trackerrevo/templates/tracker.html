@@ -254,6 +254,18 @@
             font-weight: 500;
         }
 
+        .event-item.has-route {
+            cursor: pointer;
+        }
+        .event-item.has-route:hover {
+            background: rgba(56, 189, 248, 0.15);
+        }
+        .event-item .hint-route {
+            font-size: 9px;
+            color: #38bdf8;
+            margin-top: 2px;
+        }
+
         .no-events {
             padding: 16px;
             text-align: center;
@@ -450,9 +462,11 @@
     var aircraftMarkers = {};
     var airportMarkers = [];
     var boundsRect = null;
+    var routeLayer = null;
     var soundEnabled = true;
     var refreshTimer = null;
     var eventsList = [];
+    var flightHistoryList = [];
     var isLoading = false;
     var audioCtx = null;
 
@@ -556,6 +570,8 @@
             { color: '#38bdf8', weight: 1, opacity: 0.3, fill: false, dashArray: '5, 5' }
         ).addTo(map);
 
+        routeLayer = L.layerGroup().addTo(map);
+
         // Force a resize after a short delay to ensure proper rendering
         setTimeout(function() {
             map.invalidateSize();
@@ -579,28 +595,31 @@
         });
     }
 
-    // ===== Aircraft Icon =====
-    function createAircraftIcon(heading, isTracked, onGround) {
+    // ===== Aircraft Icon (EC155/EC135 do ipmet) =====
+    var ICON_BASE = '{{ url_for("static", filename="icons/") }}';
+    function createAircraftIcon(heading, isTracked, onGround, model) {
         var rotation = (heading != null) ? heading : 0;
-        var color;
-        if (isTracked) {
-            color = onGround ? '#f59e0b' : '#22c55e';
-        } else {
-            color = onGround ? '#475569' : '#64748b';
-        }
-        var size = isTracked ? 28 : 18;
+        var size = isTracked ? 32 : 20;
         var opacity = isTracked ? 1.0 : 0.7;
-        var strokeW = isTracked ? 1 : 0;
-        var stroke = isTracked ? '#fff' : 'none';
-
-        var svg = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" style="transform:rotate(' + rotation + 'deg);opacity:' + opacity + ';">' +
-            '<path d="M12 2 L10 9 L3 12 L10 13 L10 20 L8 22 L12 21 L16 22 L14 20 L14 13 L21 12 L14 9 Z" ' +
-            'fill="' + color + '" stroke="' + stroke + '" stroke-width="' + strokeW + '"/>' +
-            '</svg>';
-
+        var iconName = (model === 'EC155' || model === 'EC135') ? model.toLowerCase() : null;
+        var html;
+        if (iconName && isTracked) {
+            var src = ICON_BASE + iconName + '.png';
+            html = '<img src="' + src + '" width="' + size + '" height="' + size + '" ' +
+                'style="transform:rotate(' + rotation + 'deg);opacity:' + opacity + ';object-fit:contain;" ' +
+                'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'block\'" />' +
+                '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" style="display:none;transform:rotate(' + rotation + 'deg);opacity:' + opacity + ';">' +
+                '<path d="M12 2 L10 9 L3 12 L10 13 L10 20 L8 22 L12 21 L16 22 L14 20 L14 13 L21 12 L14 9 Z" fill="' + (onGround ? '#f59e0b' : '#22c55e') + '"/>' +
+                '</svg>';
+        } else {
+            var color = isTracked ? (onGround ? '#f59e0b' : '#22c55e') : (onGround ? '#475569' : '#64748b');
+            html = '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" style="transform:rotate(' + rotation + 'deg);opacity:' + opacity + ';">' +
+                '<path d="M12 2 L10 9 L3 12 L10 13 L10 20 L8 22 L12 21 L16 22 L14 20 L14 13 L21 12 L14 9 Z" fill="' + color + '"/>' +
+                '</svg>';
+        }
         return L.divIcon({
             className: 'aircraft-icon',
-            html: svg,
+            html: html,
             iconSize: [size, size],
             iconAnchor: [size/2, size/2]
         });
@@ -616,7 +635,7 @@
             if (!ac.latitude || !ac.longitude) continue;
             currentIcaos[ac.icao24] = true;
 
-            var icon = createAircraftIcon(ac.heading, ac.is_tracked, ac.on_ground);
+            var icon = createAircraftIcon(ac.heading, ac.is_tracked, ac.on_ground, ac.model);
 
             if (aircraftMarkers[ac.icao24]) {
                 aircraftMarkers[ac.icao24].setLatLng([ac.latitude, ac.longitude]);
@@ -735,25 +754,79 @@
     function renderEvents() {
         var container = document.getElementById('events-list');
         if (!container) return;
-        if (eventsList.length === 0) {
+
+        var eventFlightIds = {};
+        for (var k = 0; k < eventsList.length; k++) {
+            if (eventsList[k].flight_id) eventFlightIds[eventsList[k].flight_id] = true;
+        }
+        var merged = eventsList.slice();
+        for (var h = 0; h < flightHistoryList.length; h++) {
+            var f = flightHistoryList[h];
+            if (f.id && !eventFlightIds[f.id]) {
+                merged.push({
+                    type: f.type || 'landing',
+                    registration: f.registration || '',
+                    time: f.time,
+                    flight_id: f.id,
+                    message: 'Clique para ver rota'
+                });
+                eventFlightIds[f.id] = true;
+            }
+        }
+        merged.sort(function(a, b) {
+            var ta = (a.time && new Date(a.time).getTime()) || 0;
+            var tb = (b.time && new Date(b.time).getTime()) || 0;
+            return tb - ta;
+        });
+        if (merged.length > 50) merged = merged.slice(0, 50);
+
+        if (merged.length === 0) {
             container.innerHTML = '<div class="no-events">Aguardando eventos de aeronaves rastreadas...</div>';
             return;
         }
 
         var html = '';
-        for (var i = 0; i < eventsList.length; i++) {
-            var evt = eventsList[i];
+        for (var i = 0; i < merged.length; i++) {
+            var evt = merged[i];
             var timeStr = '--:--';
             if (evt.time) {
                 try { timeStr = new Date(evt.time).toLocaleTimeString('pt-BR'); } catch(e) { timeStr = evt.time; }
             }
-            html += '<div class="event-item ' + (evt.type || '') + '">' +
+            var hasRoute = !!evt.flight_id;
+            var cls = 'event-item ' + (evt.type || '') + (hasRoute ? ' has-route' : '');
+            var onClick = hasRoute ? ' onclick="window._showRoute(\'' + evt.flight_id + '\')"' : '';
+            html += '<div class="' + cls + '"' + onClick + '>' +
                 '<div class="event-msg">' + (TYPE_LABELS[evt.type] || evt.type) + ' - ' + (evt.registration || '') + '</div>' +
                 '<div class="event-time">' + timeStr + ' - ' + (evt.message || '') + '</div>' +
+                (hasRoute ? '<div class="hint-route">Clique para ver rota no mapa</div>' : '') +
                 '</div>';
         }
         container.innerHTML = html;
     }
+
+    window._showRoute = function(flightId) {
+        if (!flightId || !map || typeof L === 'undefined' || !routeLayer) return;
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/tracker/flight-route/' + encodeURIComponent(flightId), true);
+        xhr.onload = function() {
+            if (xhr.status !== 200) return;
+            try {
+                var data = JSON.parse(xhr.responseText);
+                var route = data.route || [];
+                if (route.length < 2) return;
+                routeLayer.clearLayers();
+                var latlngs = route.map(function(p) { return [p[0], p[1]]; });
+                var polyline = L.polyline(latlngs, {
+                    color: '#38bdf8',
+                    weight: 4,
+                    opacity: 0.9
+                }).addTo(routeLayer);
+                map.fitBounds(polyline.getBounds(), { padding: [40, 40], maxZoom: 12 });
+            } catch(e) { console.warn('Route parse error', e); }
+        };
+        xhr.onerror = function() { console.warn('Route fetch failed'); };
+        xhr.send();
+    };
 
     function showPopupNotification(evt) {
         var container = document.getElementById('notification-popup');
@@ -870,6 +943,22 @@
         xhr.send();
     }
 
+    function loadFlightHistory() {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/tracker/flight-history', true);
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                try {
+                    var data = JSON.parse(xhr.responseText);
+                    flightHistoryList = data.flights || [];
+                    renderEvents();
+                } catch(e) { console.warn('Flight history parse error', e); }
+            }
+        };
+        xhr.onerror = function() {};
+        xhr.send();
+    }
+
     function loadConfig(callback) {
         var xhr = new XMLHttpRequest();
         xhr.open('GET', '/api/tracker/config', true);
@@ -938,6 +1027,7 @@
 
                     if (loadingStatus) loadingStatus.textContent = 'Buscando aeronaves...';
 
+                    loadFlightHistory();
                     fetchAircraft();
                     refreshTimer = setInterval(fetchAircraft, CONFIG.refresh_interval * 1000);
 
