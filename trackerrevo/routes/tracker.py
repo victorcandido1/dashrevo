@@ -482,6 +482,38 @@ def get_flight_history_api():
     return jsonify({'flights': flights, 'stats': log_svc.get_stats()})
 
 
+@tracker_bp.route('/api/tracker/aircraft-info/<icao24>')
+def get_aircraft_info(icao24):
+    """Busca dados extras da aeronave (modelo, operador) via ADSBdb API"""
+    import urllib.request
+    icao24 = icao24.lower().strip()
+    if not icao24 or len(icao24) != 6:
+        return jsonify({'error': 'ICAO24 inválido'}), 400
+    try:
+        req = urllib.request.Request(
+            f'https://api.adsbdb.com/v0/aircraft/{icao24}',
+            headers={'User-Agent': 'DashRevo-Tracker/1.0'}
+        )
+        with urllib.request.urlopen(req, timeout=5) as r:
+            data = r.read().decode('utf-8')
+        import json
+        j = json.loads(data)
+        ac = j.get('response', {}).get('aircraft', {})
+        if not ac:
+            return jsonify({})
+        return jsonify({
+            'type': ac.get('type'),
+            'icao_type': ac.get('icao_type'),
+            'manufacturer': ac.get('manufacturer'),
+            'registration': ac.get('registration'),
+            'operator': ac.get('registered_owner'),
+            'operator_code': ac.get('registered_owner_operator_flag_code'),
+            'country': ac.get('registered_owner_country_name'),
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 502
+
+
 @tracker_bp.route('/api/tracker/flight-route/<flight_id>')
 def get_flight_route(flight_id):
     """Retorna rota de um voo por ID"""

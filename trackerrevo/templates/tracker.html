@@ -352,6 +352,8 @@
 
         .popup-field { color: #94a3b8; }
         .popup-value { color: #e2e8f0; font-weight: 500; }
+        .popup-more { color: #38bdf8; font-size: 11px; text-decoration: none; }
+        .popup-more:hover { text-decoration: underline; }
 
         .airport-label {
             background: rgba(15, 23, 42, 0.8);
@@ -666,6 +668,20 @@
         }
     }
 
+    var CATEGORY_LABELS = {
+        2: 'Leve', 3: 'Pequeno', 4: 'Grande', 5: 'Alto vórtice', 6: 'Pesado',
+        7: 'Alta performance', 8: 'Helicóptero', 9: 'Planador', 10: 'Mais leve que ar',
+        11: 'Paraquedista', 12: 'Ultraleve', 14: 'VANT', 15: 'Espaço', 16: 'Emergência',
+        17: 'Serviço'
+    };
+    function formatLastContact(ts) {
+        if (ts == null) return '-';
+        var sec = Math.floor(Date.now()/1000) - ts;
+        if (sec < 5) return 'agora';
+        if (sec < 60) return sec + ' s atrás';
+        if (sec < 3600) return Math.floor(sec/60) + ' min atrás';
+        return new Date(ts*1000).toLocaleTimeString('pt-BR');
+    }
     function buildPopup(ac) {
         var tracked = ac.is_tracked ? '<div class="popup-tracked">RASTREADO</div>' : '';
         var reg = ac.registration || ac.callsign || ac.icao24;
@@ -678,9 +694,11 @@
             vr = (fpm > 0 ? '+' : '') + fpm + ' ft/min';
         }
         var statusTxt = ac.on_ground ? '<span style="color:#f59e0b">No solo</span>' : '<span style="color:#22c55e">Em voo</span>';
+        var lastContact = formatLastContact(ac.last_contact);
+        var squawk = (ac.squawk && ac.squawk !== '') ? ac.squawk : '-';
+        var categoryTxt = (ac.category != null && CATEGORY_LABELS[ac.category]) ? CATEGORY_LABELS[ac.category] : '-';
 
-        return '<div class="popup-reg">' + reg + '</div>' +
-            tracked +
+        var html = '<div class="popup-reg">' + reg + '</div>' + tracked +
             '<div style="margin-top:6px;">' +
             '<span class="popup-field">ICAO24:</span> <span class="popup-value">' + ac.icao24 + '</span><br>' +
             '<span class="popup-field">Callsign:</span> <span class="popup-value">' + (ac.callsign || '-') + '</span><br>' +
@@ -689,9 +707,48 @@
             '<span class="popup-field">Velocidade:</span> <span class="popup-value">' + spd + '</span><br>' +
             '<span class="popup-field">Proa:</span> <span class="popup-value">' + hdg + '</span><br>' +
             '<span class="popup-field">Razao Vertical:</span> <span class="popup-value">' + vr + '</span><br>' +
-            '<span class="popup-field">Pais:</span> <span class="popup-value">' + (ac.origin_country || '-') + '</span>' +
+            '<span class="popup-field">Squawk:</span> <span class="popup-value">' + squawk + '</span><br>' +
+            '<span class="popup-field">Categoria:</span> <span class="popup-value">' + categoryTxt + '</span><br>' +
+            '<span class="popup-field">Último contato:</span> <span class="popup-value">' + lastContact + '</span><br>' +
+            '<span class="popup-field">País:</span> <span class="popup-value">' + (ac.origin_country || '-') + '</span>' +
             '</div>';
+        html += '<div id="popup-extra-' + ac.icao24 + '" class="popup-extra" style="margin-top:8px;padding-top:8px;border-top:1px solid #334155;"></div>';
+        html += '<div style="margin-top:6px;"><a href="#" class="popup-more" data-icao="' + ac.icao24 + '">Carregar modelo/operador</a></div>';
+        return html;
     }
+    window._loadAircraftInfo = function(icao24) {
+        var el = document.getElementById('popup-extra-' + icao24);
+        var link = document.querySelector('[data-icao="' + icao24 + '"]');
+        if (!el || !link) return;
+        el.innerHTML = '<span class="popup-field">Carregando...</span>';
+        link.style.display = 'none';
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', '/api/tracker/aircraft-info/' + icao24, true);
+        xhr.onload = function() {
+            if (xhr.status === 200) {
+                try {
+                    var d = JSON.parse(xhr.responseText);
+                    if (d.error) { el.innerHTML = '<span class="popup-field">Indisponível</span>'; return; }
+                    var parts = [];
+                    if (d.type) parts.push('<span class="popup-field">Tipo:</span> ' + d.type);
+                    if (d.manufacturer) parts.push('<span class="popup-field">Fabricante:</span> ' + d.manufacturer);
+                    if (d.operator) parts.push('<span class="popup-field">Operador:</span> ' + d.operator);
+                    if (d.country) parts.push('<span class="popup-field">País operador:</span> ' + d.country);
+                    el.innerHTML = parts.length ? parts.join('<br>') : '<span class="popup-field">Sem dados adicionais</span>';
+                } catch(e) { el.innerHTML = '<span class="popup-field">Erro ao carregar</span>'; }
+            } else {
+                el.innerHTML = '<span class="popup-field">Indisponível</span>';
+            }
+        };
+        xhr.onerror = function() { el.innerHTML = '<span class="popup-field">Indisponível</span>'; };
+        xhr.send();
+    };
+    document.addEventListener('click', function(e) {
+        if (e.target && e.target.classList && e.target.classList.contains('popup-more')) {
+            e.preventDefault();
+            window._loadAircraftInfo(e.target.getAttribute('data-icao'));
+        }
+    });
 
     // ===== Tracked Panel =====
     function updateTrackedPanel(trackedData) {

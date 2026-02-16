@@ -171,16 +171,16 @@ class OpenSkyService:
         velocity_kt = round(velocity_ms * 1.94384, 1) if velocity_ms is not None else None
         altitude_m = state[7]
         altitude_ft = round(altitude_m * 3.28084) if altitude_m is not None else None
-
-        # Helicopter: our tracked aircraft OR OpenSky category 7
         category = state[17] if len(state) > 17 else None
-        is_helicopter = is_tracked or category == 7
+        # Helicopter: our tracked aircraft OR rotorcraft (8) / high-perf (7)
+        is_helicopter = is_tracked or category in (7, 8)
 
         model = HELICOPTER_MODELS.get(registration) if registration else None
         return {
             'icao24': state[0],
             'callsign': callsign,
             'origin_country': state[2],
+            'category': category,
             'latitude': lat,
             'longitude': lon,
             'altitude_m': altitude_m,
