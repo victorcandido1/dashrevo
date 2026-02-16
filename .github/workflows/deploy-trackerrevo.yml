@@ -57,5 +57,5 @@ jobs:
           echo "Tracker REVO deployed!"
           echo "URL: ${{ steps.deploy.outputs.url }}"
           echo "  /       - Dashboard"
-          echo "  /tracker - Radar de aeronaves"
+          echo "  /radar  - Radar (ou /tracker)"
           echo "=========================================="

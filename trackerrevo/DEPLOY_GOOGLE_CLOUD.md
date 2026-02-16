@@ -72,10 +72,19 @@ Todos no projeto `codigos-465200`, região `southamerica-east1`.
 
 ## Deploy automático via GitHub
 
-Push em `main` dispara deploy automático (`.github/workflows/deploy-trackerrevo.yml`).
+**Um comando** – commit, push e deploy no Google Cloud Run:
 
-1. Configure o secret `GCP_SA_KEY` no repositório (JSON da Service Account com permissão Cloud Run Admin e Storage).
-2. Push para `main` → deploy automático do trackerrevo.
+```bash
+./deploy_auto.sh
+# ou com mensagem personalizada:
+./deploy_auto.sh "Atualizar ícones do radar"
+```
+
+Fluxo: `deploy_auto.sh` → commit + push para `main` → GitHub Actions → deploy no Cloud Run.
+
+**Configuração única:**
+1. Configure o secret `GCP_SA_KEY` no repositório (Settings > Secrets > Actions).
+2. Valor: JSON da Service Account do GCP com permissões Cloud Run Admin e Storage Admin.
 
 ---
 
