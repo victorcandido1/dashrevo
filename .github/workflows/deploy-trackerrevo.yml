@@ -51,6 +51,7 @@ jobs:
             --timeout 120 \
             --allow-unauthenticated \
             --set-env-vars TZ=America/Sao_Paulo,PYTHONUNBUFFERED=1,GCS_BUCKET=trackerrevo-cache \
+            --set-secrets REVO_RADAR_BOT_TOKEN=revo-radar-bot-token:latest,REVO_RADAR_CHAT_ID=revo-radar-chat-id:latest \
             --project ${{ env.PROJECT_ID }}
 
       - name: Output URL
