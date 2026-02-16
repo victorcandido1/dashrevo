@@ -16,11 +16,11 @@ SAO_PAULO_BOUNDS = {
     'lomax': -43.0    # east (includes Rio de Janeiro)
 }
 
-# Aircraft to track - registration and possible callsign patterns
+# Aircraft to track - aceita com hífen (PR-OMB) e sem (PROMB)
 TRACKED_AIRCRAFT = {
-    'PR-OMB': ['PROMB', 'PROMB', 'PR-OMB', 'OMB'],
-    'PR-OMH': ['PROMH', 'PROMH', 'PR-OMH', 'OMH'],
-    'PR-OOE': ['PROOE', 'PROOE', 'PR-OOE', 'OOE'],
+    'PR-OMB': ['PR-OMB', 'PROMB', 'OMB'],
+    'PR-OMH': ['PR-OMH', 'PROMH', 'OMH'],
+    'PR-OOE': ['PR-OOE', 'PROOE', 'OOE'],
 }
 
 # Modelo do helicóptero por matrícula (ícones EC155 / EC135 do ipmet)
@@ -68,7 +68,8 @@ class OpenSkyService:
             f"lamin={self.bounds['lamin']}&"
             f"lamax={self.bounds['lamax']}&"
             f"lomin={self.bounds['lomin']}&"
-            f"lomax={self.bounds['lomax']}"
+            f"lomax={self.bounds['lomax']}&"
+            f"extended=1"
         )
 
         try:
