@@ -2,7 +2,7 @@
 Flight Dashboard Web Application
 Main Flask application entry point
 """
-from flask import Flask, render_template, session, jsonify
+from flask import Flask, render_template, session, jsonify, redirect, url_for
 from config import Config
 from routes.api import api_bp, set_data_processor, get_data_processor
 from routes.upload import upload_bp
@@ -58,9 +58,8 @@ def health():
 
 @app.route('/')
 def index():
-    """Main dashboard page"""
-    # Flask automatically serves templates with UTF-8 encoding
-    return render_template('index.html')
+    """Redireciona para o radar (única página do serviço)"""
+    return redirect(url_for('tracker.tracker_page'))
 
 
 if __name__ == '__main__':
