@@ -10,7 +10,6 @@ from pathlib import Path
 from datetime import datetime
 import math
 
-MAX_FLIGHTS = 500
 LOG_FILENAME = 'flight_log.json'
 GCS_BLOB = 'cache/flight_log.json'
 # Guardar voos: nossos 3 + todos os helicópteros (o filtro é feito pelo tracker que só envia is_tracked)
@@ -89,10 +88,10 @@ class FlightLogService:
             pass
 
     def _save(self):
-        """Salva no disco ou GCS"""
+        """Salva no disco ou GCS (histórico permanente, sem limite de voos)"""
         try:
             data = {
-                'flights': self._flights[-MAX_FLIGHTS:],
+                'flights': self._flights,
                 '_meta': {
                     'saved_at': datetime.now().isoformat(),
                     'count': len(self._flights),
@@ -157,14 +156,17 @@ class FlightLogService:
             **extra
         }
         self._flights.append(flight)
-        if len(self._flights) > MAX_FLIGHTS:
-            self._flights = self._flights[-MAX_FLIGHTS:]
         self._save()
         return flight_id
 
-    def get_all(self, limit=100):
-        """Retorna todos os voos (mais recentes primeiro)"""
-        return list(reversed(self._flights[-limit:]))
+    def get_all(self, limit=None, offset=0):
+        """Retorna voos (mais recentes primeiro). limit=None retorna todos."""
+        ordered = list(reversed(self._flights))
+        if offset:
+            ordered = ordered[offset:]
+        if limit is not None:
+            ordered = ordered[:limit]
+        return ordered
 
     def get_route(self, flight_id):
         """Retorna rota de um voo por ID"""

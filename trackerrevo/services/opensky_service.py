@@ -64,16 +64,24 @@ class OpenSkyService:
         self.tracked = tracked or TRACKED_AIRCRAFT
         self._aircraft_states = {}  # icao24 -> previous state for event detection
         self._event_log = []  # Recent events
+        self._rate_limited_until = 0  # timestamp when rate limit expires
+        self._consecutive_errors = 0
 
     def get_aircraft_in_region(self):
         """Get all aircraft currently in the monitored region"""
+        # Rate limit backoff: skip OpenSky if we got 429 recently
+        now = time.time()
+        if now < self._rate_limited_until:
+            logger.info("OpenSky rate limited, using adsb.lol fallback (backoff until %s)",
+                        datetime.fromtimestamp(self._rate_limited_until).strftime('%H:%M:%S'))
+            return self._response_with_fallback_only()
+
         url = (
             f"{self.BASE_URL}/states/all?"
             f"lamin={self.bounds['lamin']}&"
             f"lamax={self.bounds['lamax']}&"
             f"lomin={self.bounds['lomin']}&"
-            f"lomax={self.bounds['lomax']}&"
-            f"extended=1"
+            f"lomax={self.bounds['lomax']}"
         )
 
         try:
@@ -83,8 +91,10 @@ class OpenSkyService:
 
             if not data or not data.get('states'):
                 # OpenSky vazio: tenta adsb.lol como fallback para nossas 3 aeronaves
+                logger.info("OpenSky returned empty states, using adsb.lol fallback")
                 return self._response_with_fallback_only()
 
+            self._consecutive_errors = 0
             aircraft_list = []
             tracked_events = []
 
@@ -111,8 +121,9 @@ class OpenSkyService:
             except Exception as e:
                 logger.debug("adsb.lol fallback: %s", e)
 
-            # Clean up stale states
-            self._cleanup_stale()
+            # Clean up stale states and include lost_signal events
+            lost_events = self._cleanup_stale()
+            tracked_events.extend(lost_events)
 
             # Store events in log
             self._event_log.extend(tracked_events)
@@ -128,14 +139,23 @@ class OpenSkyService:
             }
 
         except urllib.error.HTTPError as e:
+            self._consecutive_errors += 1
             if e.code == 429:
+                # Backoff: 30s first time, then 60s, 120s, max 300s
+                backoff = min(30 * (2 ** (self._consecutive_errors - 1)), 300)
+                self._rate_limited_until = time.time() + backoff
+                logger.warning("OpenSky 429 rate limited, backing off %ds (errors=%d)",
+                               backoff, self._consecutive_errors)
                 resp = self._response_with_fallback_only()
-                resp['error'] = 'Limite de requisições excedido. Aguarde alguns segundos.'
+                resp['error'] = f'Limite de requisições OpenSky. Usando adsb.lol (retry em {backoff}s).'
                 return resp
+            logger.warning("OpenSky HTTP error %d, using fallback", e.code)
             resp = self._response_with_fallback_only()
-            resp['error'] = f'Erro na API: {e.code}'
+            resp['error'] = f'Erro na API OpenSky: {e.code}'
             return resp
         except Exception as e:
+            self._consecutive_errors += 1
+            logger.warning("OpenSky error: %s, using fallback", e)
             resp = self._response_with_fallback_only()
             resp['error'] = str(e)
             return resp
@@ -328,22 +348,31 @@ class OpenSkyService:
         return summary
 
     def _cleanup_stale(self):
-        """Remove aircraft states that haven't been seen recently"""
+        """Remove aircraft states that haven't been seen recently.
+        Returns list of lost_signal events so they can be included in tracked_events."""
         now = time.time()
         stale_keys = [
             k for k, v in self._aircraft_states.items()
             if now - v.get('last_seen', 0) > STALE_TIMEOUT
         ]
+        lost_events = []
         for k in stale_keys:
-            reg = self._aircraft_states[k].get('registration')
+            state = self._aircraft_states[k]
+            reg = state.get('registration')
             if reg:
-                self._event_log.append({
+                evt = {
                     'type': 'lost_signal',
                     'registration': reg,
+                    'icao24': k,
+                    'latitude': state.get('latitude'),
+                    'longitude': state.get('longitude'),
                     'time': datetime.now().isoformat(),
                     'message': f'{reg} - sinal perdido'
-                })
+                }
+                self._event_log.append(evt)
+                lost_events.append(evt)
             del self._aircraft_states[k]
+        return lost_events
 
 
 # Singleton instance
