@@ -37,6 +37,8 @@ uploads/
 .cache/cache_metadata.json
 .cache/*.tmp
 .cache/*.bak
+# Rastreio de movimento de aeronaves (dados transitórios)
+.cache/aircraft_movement_cache.json
 
 # IDE
 .vscode/
