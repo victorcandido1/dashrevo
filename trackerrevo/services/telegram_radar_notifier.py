@@ -133,16 +133,32 @@ def _build_message(ev, trail_points=None):
         return text
     if ev_type == 'detected':
         return f"🔔 <b>DETECTADO</b>\n\n✈️ {reg}\n{msg}\n⏰ {hora}"
+    if ev_type == 'lost_signal':
+        return f"📡 <b>SINAL PERDIDO</b>\n\n✈️ {reg}\n{msg}\n⏰ {hora}"
     return msg or f"{reg} - {ev_type}"
 
 
 def _is_configured():
-    return bool(os.environ.get('REVO_RADAR_BOT_TOKEN') and os.environ.get('REVO_RADAR_CHAT_ID'))
+    token = os.environ.get('REVO_RADAR_BOT_TOKEN')
+    chat_id = os.environ.get('REVO_RADAR_CHAT_ID')
+    return bool(token and chat_id)
+
+
+def get_status():
+    """Retorna status da configuração do Telegram (útil para diagnóstico)"""
+    token = os.environ.get('REVO_RADAR_BOT_TOKEN')
+    chat_id = os.environ.get('REVO_RADAR_CHAT_ID')
+    return {
+        'configured': bool(token and chat_id),
+        'has_token': bool(token),
+        'has_chat_id': bool(chat_id),
+    }
 
 
 def send_event(event, trail_points=None):
     """Envia evento para o Telegram no padrão do outro bot"""
     if not _is_configured():
+        logger.debug("Telegram not configured (REVO_RADAR_BOT_TOKEN and/or REVO_RADAR_CHAT_ID missing)")
         return False
     token = os.environ.get('REVO_RADAR_BOT_TOKEN')
     chat_id = os.environ.get('REVO_RADAR_CHAT_ID')
@@ -171,11 +187,22 @@ def notify_events(events, get_trail_fn=None):
     Envia lista de eventos para o Telegram.
     get_trail_fn: callable(icao24) -> list of points (para pouso com rota)
     """
-    for ev in events or []:
+    if not events:
+        return
+    if not _is_configured():
+        logger.info("Telegram bot not configured - skipping %d events. "
+                     "Set REVO_RADAR_BOT_TOKEN and REVO_RADAR_CHAT_ID env vars to enable.",
+                     len(events))
+        return
+    for ev in events:
         t = ev.get('type', '')
-        if t not in ('landing', 'takeoff', 'detected'):
+        if t not in ('landing', 'takeoff', 'detected', 'lost_signal'):
             continue
         trail = None
-        if t == 'landing' and get_trail_fn:
+        if t in ('landing', 'lost_signal') and get_trail_fn:
             trail = get_trail_fn(ev.get('icao24', ''))
-        send_event(ev, trail)
+        ok = send_event(ev, trail)
+        if ok:
+            logger.info("Telegram: sent %s event for %s", t, ev.get('registration', '?'))
+        else:
+            logger.warning("Telegram: failed to send %s event for %s", t, ev.get('registration', '?'))
