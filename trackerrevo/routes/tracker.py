@@ -4,7 +4,7 @@ Real-time aircraft tracking with map visualization for São Paulo region
 """
 import os
 import logging
-from flask import Blueprint, jsonify, Response, render_template
+from flask import Blueprint, jsonify, Response, render_template, request
 from services.opensky_service import (
     get_opensky_service,
     SAO_PAULO_BOUNDS,
@@ -77,10 +77,13 @@ def get_events():
 
 @tracker_bp.route('/api/tracker/flight-history')
 def get_flight_history_api():
-    """Lista histórico de voos salvos (com rotas)"""
+    """Lista histórico de voos salvos (permanente).
+    Query params: ?limit=N&offset=N (sem limit = retorna todos)"""
     log_svc = get_flight_log()
-    flights = log_svc.get_all(limit=100)
-    return jsonify({'flights': flights, 'stats': log_svc.get_stats()})
+    limit = request.args.get('limit', type=int)
+    offset = request.args.get('offset', 0, type=int)
+    flights = log_svc.get_all(limit=limit, offset=offset)
+    return jsonify({'flights': flights, 'total': log_svc.get_stats()['count'], 'stats': log_svc.get_stats()})
 
 
 @tracker_bp.route('/api/tracker/aircraft-info/<icao24>')

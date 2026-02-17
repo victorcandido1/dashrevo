@@ -14,8 +14,8 @@ from datetime import datetime
 # Histórico: icao24 -> lista de posições [{lat, lon, alt, velocity_kt, ...}, ...]
 # Salvar aeronaves rastreadas: PR-OOE, PR-OMB, PR-OMH e todos os helicópteros (categoria 8)
 TRACKED_REGISTRATIONS = frozenset({'PROOE', 'PROMB', 'PROMH'})
-MAX_POINTS_PER_AIRCRAFT = 3600  # ~2h com polling a cada 2s ou ~1h a 1pt/s
-MAX_AGE_SECONDS = 7200  # 2 horas de retenção (era 30 min, insuficiente para capturar voos)
+MAX_POINTS_PER_AIRCRAFT = 7200  # ~4h com polling a cada 2s
+MAX_AGE_SECONDS = 14400  # 4 horas de retenção em memória (trail é salvo permanentemente no flight_log ao pousar)
 MIN_INTERVAL_SEC = 1  # mínimo 1 segundo entre pontos
 CACHE_FILENAME = 'aircraft_movement_cache.json'
 GCS_BLOB = 'cache/aircraft_movement_cache.json'
