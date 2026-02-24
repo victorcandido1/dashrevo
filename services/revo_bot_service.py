@@ -4,6 +4,7 @@ Revo Bot integration for aircraft movement messages.
 import json
 import os
 import re
+import uuid
 from datetime import datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -298,6 +299,81 @@ class RevoBotService:
         except Exception as exc:
             return False, None, str(exc)
 
+    def _send_telegram_file(self, endpoint, file_field, file_path, mime_type, extra_fields=None):
+        """Send file to Telegram using multipart/form-data."""
+        if not self.telegram_token or not self.telegram_chat_id:
+            return False, None, 'Telegram credentials not configured'
+
+        path = Path(file_path)
+        if not path.exists():
+            return False, None, f'File not found: {file_path}'
+
+        fields = {
+            'chat_id': self.telegram_chat_id,
+        }
+        if extra_fields:
+            fields.update(extra_fields)
+
+        boundary = f'----RevoBoundary{uuid.uuid4().hex}'
+        body_chunks = []
+
+        for name, value in fields.items():
+            body_chunks.append(f'--{boundary}\r\n'.encode('utf-8'))
+            body_chunks.append(
+                f'Content-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode('utf-8')
+            )
+
+        body_chunks.append(f'--{boundary}\r\n'.encode('utf-8'))
+        body_chunks.append(
+            (
+                f'Content-Disposition: form-data; name="{file_field}"; '
+                f'filename="{path.name}"\r\n'
+            ).encode('utf-8')
+        )
+        body_chunks.append(f'Content-Type: {mime_type}\r\n\r\n'.encode('utf-8'))
+        body_chunks.append(path.read_bytes())
+        body_chunks.append(b'\r\n')
+        body_chunks.append(f'--{boundary}--\r\n'.encode('utf-8'))
+
+        body = b''.join(body_chunks)
+
+        telegram_url = f'https://api.telegram.org/bot{self.telegram_token}/{endpoint}'
+        request = Request(
+            telegram_url,
+            data=body,
+            headers={'Content-Type': f'multipart/form-data; boundary={boundary}'},
+            method='POST'
+        )
+
+        try:
+            with urlopen(request, timeout=self.timeout_seconds) as response:
+                status_code = getattr(response, 'status', 200)
+                response_text = response.read().decode('utf-8', errors='ignore')
+                if 200 <= status_code < 300:
+                    return True, status_code, response_text
+                return False, status_code, response_text
+        except HTTPError as exc:
+            error_body = exc.read().decode('utf-8', errors='ignore')
+            return False, exc.code, error_body
+        except URLError as exc:
+            return False, None, str(exc)
+        except Exception as exc:
+            return False, None, str(exc)
+
+    def _send_telegram_animation(self, gif_path, caption=''):
+        """Send animated GIF to Telegram."""
+        return self._send_telegram_file(
+            endpoint='sendAnimation',
+            file_field='animation',
+            file_path=gif_path,
+            mime_type='image/gif',
+            extra_fields={
+                'caption': caption,
+                'parse_mode': 'HTML',
+                'disable_notification': 'false',
+            },
+        )
+
     def extract_moves(self, df, source='unknown'):
         """Extract unique aircraft movement events from a dataframe."""
         if df is None or len(df) == 0:
@@ -387,7 +463,7 @@ class RevoBotService:
                 'already_sent': detected_moves,
                 'skipped_by_limit': 0,
                 'live_map_url': resolved_live_map_url,
-                'reason': 'Revo Bot disabled or missing REVO_BOT_WEBHOOK_URL'
+                'reason': 'Revo Bot disabled or missing webhook/telegram credentials'
             }
 
         sent_ids = self._load_sent_move_ids()
@@ -455,19 +531,12 @@ class RevoBotService:
 
         return result
 
-    def notify_weather_alerts(self, alerts, live_map_url=None):
+    def notify_weather_alerts(self, alerts, live_map_url=None, radar_gif_path=None):
         """Notify Revo Bot for weather alerts."""
         resolved_live_map_url = self._resolve_live_map_url(live_map_url)
         total_alerts = len(alerts)
-
-        if total_alerts == 0:
-            return {
-                'enabled': self.enabled,
-                'total_alerts': 0,
-                'sent': 0,
-                'failed': 0,
-                'live_map_url': resolved_live_map_url
-            }
+        radar_gif_sent = False
+        failures = []
 
         if not self.enabled:
             return {
@@ -476,12 +545,36 @@ class RevoBotService:
                 'sent': 0,
                 'failed': 0,
                 'live_map_url': resolved_live_map_url,
-                'reason': 'Revo Bot disabled or missing REVO_BOT_WEBHOOK_URL'
+                'radar_gif_sent': False,
+                'reason': 'Revo Bot disabled or missing webhook/telegram credentials'
+            }
+
+        if radar_gif_path and self.telegram_token and self.telegram_chat_id:
+            radar_caption = "🌧️ <b>Radar IPMet - última 1h</b>"
+            if resolved_live_map_url:
+                radar_caption = f"{radar_caption}\n🔗 {resolved_live_map_url}"
+            ok, status_code, response_text = self._send_telegram_animation(radar_gif_path, radar_caption)
+            radar_gif_sent = ok
+            if not ok:
+                failures.append({
+                    'type': 'radar_gif',
+                    'status_code': status_code,
+                    'error': response_text[:500] if response_text else 'Failed to send radar GIF'
+                })
+
+        if total_alerts == 0:
+            return {
+                'enabled': self.enabled,
+                'total_alerts': 0,
+                'sent': 0,
+                'failed': 0,
+                'live_map_url': resolved_live_map_url,
+                'radar_gif_sent': radar_gif_sent,
+                'failures': failures if failures else []
             }
 
         sent_count = 0
         failed_count = 0
-        failures = []
 
         for alert in alerts:
             payload = {
@@ -517,7 +610,8 @@ class RevoBotService:
             'total_alerts': total_alerts,
             'sent': sent_count,
             'failed': failed_count,
-            'live_map_url': resolved_live_map_url
+            'live_map_url': resolved_live_map_url,
+            'radar_gif_sent': radar_gif_sent,
         }
         if failures:
             result['failures'] = failures

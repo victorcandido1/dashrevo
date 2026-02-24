@@ -62,6 +62,8 @@ Variáveis opcionais:
 - `REVO_BOT_STATE_FILE` (padrão: `.cache/revo_bot_sent_moves.json`)
 - `REVO_WEATHER_AIRPORTS` (padrão: `SBGR,SBSP,SBMT,SBKP`)
 - `REVO_BOT_WEATHER_STATE_FILE` (padrão: `.cache/revo_bot_weather_alerts.json`)
+- `REVO_IPMET_RADAR_GIF_URL` (padrão: `https://www.ipmetradar.com.br/imagens/anima-survei/ppi.gif`)
+- `REVO_IPMET_LAST_HOUR_FRAMES` (padrão: `12`)
 
 O sistema evita reenvio duplicado de movimentos já notificados, usando arquivo de estado em cache.
 Cada mensagem enviada ao bot inclui o link do mapa ao vivo.
@@ -70,6 +72,8 @@ Para reativar alertas meteorológicos (METAR/TAF), use:
 - `GET/POST /api/salesforce/weather/check`
 
 Esse endpoint consulta AviationWeather e envia apenas alertas novos (sem duplicar avisos já enviados).
+Se houver **SPECI com chuva** ou **METAR com chuva** nos aeroportos monitorados, o sistema também envia o
+**GIF do radar IPMet da última 1 hora** (recorte dos frames mais recentes).
 
 ## 🏃 Executando Localmente
 

@@ -12,6 +12,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from config import Config
+from services.ipmet_radar_service import get_ipmet_radar_service
 from services.revo_bot_service import get_revo_bot_service
 
 
@@ -30,6 +31,8 @@ HELI_MINIMUMS = {
     "ceiling_ft": 600,
     "visibility_m": 3000,
 }
+
+RAIN_MARKERS = ("RA", "SHRA", "DZ", "VCSH")
 
 
 class WeatherAlertService:
@@ -297,6 +300,21 @@ class WeatherAlertService:
         normalized = [re.sub(r"\s+", " ", str(part).strip().upper()) for part in parts]
         return "|".join(normalized)
 
+    def _contains_rain(self, weather_tokens):
+        """Check if METAR weather tokens indicate rain/drizzle/showers."""
+        for token in weather_tokens or []:
+            token_upper = str(token).strip().upper()
+            if any(marker in token_upper for marker in RAIN_MARKERS):
+                return True
+        return False
+
+    def _is_rain_metar_condition(self, metar):
+        """True for METAR/SPECI entries with rain-related weather."""
+        metar_type = str(metar.get("type", "")).strip().upper()
+        if metar_type not in {"METAR", "SPECI"}:
+            return False
+        return self._contains_rain(metar.get("weather", []))
+
     def _load_last_alert_keys(self):
         """Load previously notified weather alert keys."""
         if not self.state_file.exists():
@@ -320,7 +338,7 @@ class WeatherAlertService:
         )
 
     def check_and_notify(self, live_map_url=None):
-        """Run weather check and send only new alerts to Revo Bot."""
+        """Run weather check and send alerts to Revo Bot."""
         weather_data = self.check_weather()
         all_alerts = weather_data.get("alerts", [])
         current_keys = {self._alert_key(alert) for alert in all_alerts}
@@ -330,9 +348,31 @@ class WeatherAlertService:
             alert for alert in all_alerts if self._alert_key(alert) not in previous_keys
         ]
 
+        rainy_metars = [
+            metar for metar in weather_data.get("metars", [])
+            if self._is_rain_metar_condition(metar)
+        ]
+        rainy_specis = [
+            metar for metar in rainy_metars
+            if str(metar.get("type", "")).strip().upper() == "SPECI"
+        ]
+        rainy_regular_metars = [
+            metar for metar in rainy_metars
+            if str(metar.get("type", "")).strip().upper() == "METAR"
+        ]
+
+        radar_gif_path = None
+        radar_capture_error = None
+        if rainy_metars:
+            try:
+                radar_gif_path = get_ipmet_radar_service().get_last_hour_radar_gif()
+            except Exception as exc:
+                radar_capture_error = str(exc)
+
         revo_result = get_revo_bot_service().notify_weather_alerts(
             new_alerts,
             live_map_url=live_map_url,
+            radar_gif_path=str(radar_gif_path) if radar_gif_path else None,
         )
 
         # Persist current snapshot regardless of bot send outcome.
@@ -342,6 +382,11 @@ class WeatherAlertService:
             "airports_checked": self.airports,
             "total_alerts": len(all_alerts),
             "new_alerts": len(new_alerts),
+            "rain_metars_detected": len(rainy_metars),
+            "rain_speci_detected": len(rainy_specis),
+            "rain_metar_detected": len(rainy_regular_metars),
+            "radar_gif_path": str(radar_gif_path) if radar_gif_path else None,
+            "radar_capture_error": radar_capture_error,
             "weather_data": {
                 "metars": len(weather_data.get("metars", [])),
                 "tafs": len(weather_data.get("tafs", [])),

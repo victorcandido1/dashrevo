@@ -37,6 +37,8 @@ uploads/
 .cache/cache_metadata.json
 .cache/*.tmp
 .cache/*.bak
+.cache/revo_bot_weather_alerts.json
+.cache/weather_images/*
 
 # IDE
 .vscode/
