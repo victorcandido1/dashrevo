@@ -3,6 +3,7 @@ Revo Bot integration for aircraft movement messages.
 """
 import json
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -91,6 +92,39 @@ class RevoBotService:
             return ''
         return str(value).strip()
 
+    def _normalize_aircraft_prefix(self, prefix_value='', flight_number=''):
+        """Normalize aircraft prefix using Salesforce callsign patterns."""
+        callsign_map = {
+            'PROOE': 'PR-OOE',
+            'PROMB': 'PR-OMB',
+            'PROMH': 'PR-OMH',
+            'PROOE1': 'PR-OOE',
+            'PROOE2': 'PR-OOE',
+        }
+
+        for value in (prefix_value, flight_number):
+            text = self._safe_str(value).upper()
+            if not text:
+                continue
+
+            compact = re.sub(r'[^A-Z0-9]', '', text)
+
+            if compact in callsign_map:
+                return callsign_map[compact]
+
+            for callsign, normalized in callsign_map.items():
+                if compact.startswith(callsign):
+                    return normalized
+
+            # Normalize PRXXX to PR-XXX
+            if compact.startswith('PR') and len(compact) == 5:
+                return f"{compact[:2]}-{compact[2:]}"
+
+            if re.match(r'^PR-[A-Z0-9]{3}$', text):
+                return text
+
+        return self._safe_str(prefix_value)
+
     def _build_movement_time(self, row, date_col, time_col=None):
         """Parse movement datetime from available date/time columns."""
         if date_col is None:
@@ -117,6 +151,7 @@ class RevoBotService:
             move.get('prefix', ''),
             move.get('origin', ''),
             move.get('destination', ''),
+            move.get('route_full', ''),
             move.get('movement_time', ''),
             move.get('flight_number', ''),
         ]
@@ -133,6 +168,7 @@ class RevoBotService:
         prefix = move.get('prefix') or move.get('model') or 'UNKNOWN_AIRCRAFT'
         origin = move.get('origin') or 'UNKNOWN_ORIGIN'
         destination = move.get('destination') or 'UNKNOWN_DESTINATION'
+        route_full = (move.get('route_full') or '').strip()
 
         movement_time = move.get('movement_time')
         if movement_time:
@@ -145,6 +181,15 @@ class RevoBotService:
             movement_time = 'UNKNOWN_TIME'
 
         base_message = f"{prefix} moved from {origin} to {destination} at {movement_time}"
+        if route_full:
+            compact_route = re.sub(r'\s+', '', route_full.upper())
+            direct_routes = {
+                re.sub(r'\s+', '', f"{origin}-{destination}".upper()),
+                re.sub(r'\s+', '', f"{origin}→{destination}".upper()),
+                re.sub(r'\s+', '', f"{origin}>{destination}".upper()),
+            }
+            if compact_route not in direct_routes:
+                base_message = f"{base_message}\nRoute: {route_full}"
         if live_map_url:
             return f"{base_message}\nLive map: {live_map_url}"
         return base_message
@@ -202,11 +247,15 @@ class RevoBotService:
         if df is None or len(df) == 0:
             return []
 
-        prefix_col = self._pick_column(df, ['Aircraft_Prefix', 'Prefixo', 'registration'])
+        prefix_col = self._pick_column(df, ['Aircraft_Prefix', 'Prefixo', 'PrefixoTexto__c', 'registration'])
         model_col = self._pick_column(df, ['Aircraft_Model', 'Modelo', 'aircraft_type'])
         origin_col = self._pick_column(df, ['Departure', 'Origem', 'origin', 'Origin'])
         destination_col = self._pick_column(df, ['Arrival', 'Destino', 'destination', 'Destination'])
-        flight_col = self._pick_column(df, ['Flight_Number', 'Numero_Voo', 'sheet', 'Sheet_Name'])
+        route_col = self._pick_column(df, [
+            'Rota_ICAO_Full', 'Route_ICAO_Full', 'Rota_ICAO', 'Route_ICAO',
+            'Route', 'Rota', 'Voo: Rota (Extenso)'
+        ])
+        flight_col = self._pick_column(df, ['Flight_Number', 'Numero_Voo', 'Callsign', 'sheet', 'Sheet_Name'])
         date_col = self._pick_column(df, ['Date_Parsed', 'Data_Voo', 'Flight_Date', 'flight_date', 'Date'])
         time_col = self._pick_column(df, ['time', 'Time'])
 
@@ -216,17 +265,22 @@ class RevoBotService:
 
         extracted = []
         for _, row in df.iterrows():
-            prefix = self._safe_str(row[prefix_col]) if prefix_col else ''
             model = self._safe_str(row[model_col]) if model_col else ''
             origin = self._safe_str(row[origin_col]) if origin_col else ''
             destination = self._safe_str(row[destination_col]) if destination_col else ''
             flight_number = self._safe_str(row[flight_col]) if flight_col else ''
+            route_full = self._safe_str(row[route_col]) if route_col else ''
+            prefix_raw = self._safe_str(row[prefix_col]) if prefix_col else ''
+            prefix = self._normalize_aircraft_prefix(prefix_raw, flight_number)
 
             if not prefix and not model:
                 continue
 
             if not origin and not destination:
                 continue
+
+            if not route_full and origin and destination:
+                route_full = f"{origin}-{destination}"
 
             movement_dt = self._build_movement_time(row, date_col, time_col)
             movement_time = movement_dt.isoformat(timespec='minutes') if movement_dt else ''
@@ -237,6 +291,7 @@ class RevoBotService:
                 'model': model,
                 'origin': origin,
                 'destination': destination,
+                'route_full': route_full,
                 'flight_number': flight_number,
                 'movement_time': movement_time,
             }
@@ -304,6 +359,7 @@ class RevoBotService:
                     'model': move.get('model', ''),
                     'origin': move.get('origin', ''),
                     'destination': move.get('destination', ''),
+                    'route_full': move.get('route_full', ''),
                     'flight_number': move.get('flight_number', ''),
                     'movement_time': move.get('movement_time', ''),
                     'move_id': move.get('move_id', ''),

@@ -25,6 +25,13 @@ AERONAVE_MODELO = {
     'PS-HAH': 'H145'
 }
 
+# Callsign/flight code to aircraft prefix mapping (Salesforce patterns)
+CALLSIGN_TO_PREFIX = {
+    'PROMH': 'PR-OMH',
+    'PROMB': 'PR-OMB',
+    'PROOE': 'PR-OOE',
+}
+
 # Passenger capacity per model
 CAPACIDADE_PAX = {
     'EC155': 6,
@@ -202,6 +209,91 @@ class SalesforceProcessor:
     def __init__(self, rotaer_processor=None):
         self.rotaer = rotaer_processor if rotaer_processor else RotaerProcessor()
         self.df = None
+
+    def _normalize_prefix(self, value):
+        """Normalize Salesforce aircraft prefix/callsign values."""
+        if pd.isna(value):
+            return ''
+
+        text = str(value).strip().upper()
+        if not text or text == 'NAN':
+            return ''
+
+        compact = re.sub(r'[^A-Z0-9]', '', text)
+
+        if compact in CALLSIGN_TO_PREFIX:
+            return CALLSIGN_TO_PREFIX[compact]
+
+        # Sometimes callsign can include suffixes (e.g. PROOE1)
+        for callsign, prefix in CALLSIGN_TO_PREFIX.items():
+            if compact.startswith(callsign):
+                return prefix
+
+        # Normalize PRXXX to PR-XXX
+        if compact.startswith('PR') and len(compact) == 5:
+            return f"{compact[:2]}-{compact[2:]}"
+
+        if re.match(r'^PR-[A-Z0-9]{3}$', text):
+            return text
+
+        return text
+
+    def _extract_route_details(self, route_text):
+        """Extract origin/destination and full ICAO chain from route text."""
+        icao_pattern = re.compile(r'^[A-Z][A-Z0-9]{3}$')
+
+        text = '' if pd.isna(route_text) else str(route_text).strip()
+        if not text or text.upper() == 'NAN':
+            return ('', '', '', '', '')
+
+        # Primary split for extenso route text.
+        hop_parts = [p.strip() for p in re.split(r'\s*(?:>|→)\s*', text) if p.strip()]
+        if len(hop_parts) >= 2:
+            origin = hop_parts[0]
+            destination = hop_parts[-1]
+        else:
+            # Fallback for compressed route formats: SIAV-SBGR-SDOF-SIAV
+            dash_parts = [p.strip() for p in re.split(r'\s*-\s*', text) if p.strip()]
+            if len(dash_parts) >= 2:
+                origin = dash_parts[0]
+                destination = dash_parts[-1]
+                hop_parts = dash_parts
+            else:
+                origin = text
+                destination = text
+
+        # Capture every ICAO code in the route string.
+        icao_tokens = re.findall(r'\b([A-Z][A-Z0-9]{3})\b', text.upper())
+        if len(icao_tokens) < 2:
+            # Fallback extraction from resolved hop parts.
+            extracted = []
+            for part in hop_parts if hop_parts else [origin, destination]:
+                icao = self.rotaer.extract_icao(part)
+                if isinstance(icao, str):
+                    icao = icao.strip().upper()
+                if isinstance(icao, str) and icao_pattern.match(icao):
+                    if not extracted or extracted[-1] != icao:
+                        extracted.append(icao)
+            icao_tokens = extracted
+
+        if len(icao_tokens) >= 2:
+            origin_icao = icao_tokens[0]
+            destination_icao = icao_tokens[-1]
+            route_full = '-'.join(icao_tokens)
+        else:
+            origin_icao = self.rotaer.extract_icao(origin)
+            destination_icao = self.rotaer.extract_icao(destination)
+            if (
+                isinstance(origin_icao, str)
+                and isinstance(destination_icao, str)
+                and icao_pattern.match(origin_icao)
+                and icao_pattern.match(destination_icao)
+            ):
+                route_full = f"{origin_icao}-{destination_icao}"
+            else:
+                route_full = ''
+
+        return (origin, destination, origin_icao, destination_icao, route_full)
     
     def process(self, salesforce_path):
         """Process Salesforce HTML report"""
@@ -265,34 +357,41 @@ class SalesforceProcessor:
             df['Mes'] = df['Data_Voo'].dt.month
             df['Mes_Nome'] = df['Data_Voo'].dt.strftime('%Y-%m')
             
-            # Parse routes
+            # Parse routes (including chained routes like SIAV-SBGR-SDOF-SIAV)
             if 'Voo: Rota (Extenso)' in df.columns:
-                df['Origem'] = df['Voo: Rota (Extenso)'].str.split(' > ').str[0].str.strip()
-                df['Destino'] = df['Voo: Rota (Extenso)'].str.split(' > ').str[-1].str.strip()
+                route_details = df['Voo: Rota (Extenso)'].apply(self._extract_route_details).apply(pd.Series)
+                route_details.columns = ['Origem', 'Destino', 'Origem_ICAO', 'Destino_ICAO', 'Rota_ICAO_Full']
+                df[['Origem', 'Destino', 'Origem_ICAO', 'Destino_ICAO', 'Rota_ICAO_Full']] = route_details
             elif 'Departure' in df.columns and 'Arrival' in df.columns:
-                df['Origem'] = df['Departure'].str.strip()
-                df['Destino'] = df['Arrival'].str.strip()
+                df['Origem'] = df['Departure'].astype(str).str.strip()
+                df['Destino'] = df['Arrival'].astype(str).str.strip()
+                df['Origem_ICAO'] = df['Origem'].apply(self.rotaer.extract_icao)
+                df['Destino_ICAO'] = df['Destino'].apply(self.rotaer.extract_icao)
+                df['Rota_ICAO_Full'] = df['Origem_ICAO'].astype(str) + '-' + df['Destino_ICAO'].astype(str)
             else:
                 df['Origem'] = ''
                 df['Destino'] = ''
-            
-            df['Rota'] = df['Origem'] + ' → ' + df['Destino']
-            
-            # Extract ICAO codes for route
-            df['Rota_ICAO'] = df.apply(
-                lambda row: f"{self.rotaer.extract_icao(row['Origem'])} → {self.rotaer.extract_icao(row['Destino'])}",
-                axis=1
-            )
+                df['Origem_ICAO'] = ''
+                df['Destino_ICAO'] = ''
+                df['Rota_ICAO_Full'] = ''
+
+            df['Rota'] = df['Origem'].astype(str) + ' → ' + df['Destino'].astype(str)
+            df['Rota_ICAO'] = df['Origem_ICAO'].astype(str) + ' → ' + df['Destino_ICAO'].astype(str)
             
             df['Numero_Voo'] = df[voo_col]
             
             # Aircraft info
             if 'Voo: Prefixo' in df.columns:
-                df['Prefixo'] = df['Voo: Prefixo']
-                df['Modelo'] = df['Prefixo'].map(AERONAVE_MODELO).fillna('Desconhecido')
+                df['Prefixo'] = df['Voo: Prefixo'].apply(self._normalize_prefix)
             else:
                 df['Prefixo'] = ''
-                df['Modelo'] = 'Desconhecido'
+
+            # Fallback: infer from flight number/callsign (e.g. PROOE, PROMB, PROMH)
+            df['Prefixo'] = df.apply(
+                lambda row: self._normalize_prefix(row.get('Prefixo', '')) or self._normalize_prefix(row.get('Numero_Voo', '')),
+                axis=1
+            )
+            df['Modelo'] = df['Prefixo'].map(AERONAVE_MODELO).fillna('Desconhecido')
             
             # Flight type
             if 'Voo: Tipo' in df.columns:
