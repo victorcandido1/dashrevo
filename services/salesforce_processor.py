@@ -248,33 +248,47 @@ class SalesforceProcessor:
 
         # Primary split for extenso route text.
         hop_parts = [p.strip() for p in re.split(r'\s*(?:>|→)\s*', text) if p.strip()]
+        dash_parts = [p.strip() for p in re.split(r'\s*-\s*', text) if p.strip()]
+        compact_dash_route = len(dash_parts) >= 2 and all(icao_pattern.match(part.upper()) for part in dash_parts)
+
         if len(hop_parts) >= 2:
             origin = hop_parts[0]
             destination = hop_parts[-1]
+        elif compact_dash_route:
+            # Compact route chain with only ICAO tokens.
+            hop_parts = dash_parts
+            origin = dash_parts[0]
+            destination = dash_parts[-1]
         else:
             # Fallback for compressed route formats: SIAV-SBGR-SDOF-SIAV
-            dash_parts = [p.strip() for p in re.split(r'\s*-\s*', text) if p.strip()]
             if len(dash_parts) >= 2:
                 origin = dash_parts[0]
                 destination = dash_parts[-1]
-                hop_parts = dash_parts
             else:
                 origin = text
                 destination = text
 
-        # Capture every ICAO code in the route string.
-        icao_tokens = re.findall(r'\b([A-Z][A-Z0-9]{3})\b', text.upper())
-        if len(icao_tokens) < 2:
-            # Fallback extraction from resolved hop parts.
-            extracted = []
-            for part in hop_parts if hop_parts else [origin, destination]:
+        icao_tokens = []
+        if len(hop_parts) >= 2:
+            for part in hop_parts:
                 icao = self.rotaer.extract_icao(part)
                 if isinstance(icao, str):
                     icao = icao.strip().upper()
                 if isinstance(icao, str) and icao_pattern.match(icao):
-                    if not extracted or extracted[-1] != icao:
-                        extracted.append(icao)
-            icao_tokens = extracted
+                    if not icao_tokens or icao_tokens[-1] != icao:
+                        icao_tokens.append(icao)
+        elif compact_dash_route:
+            icao_tokens = [part.upper() for part in dash_parts]
+
+        if len(icao_tokens) < 2:
+            # Last-resort parser: tokens that look like regional ICAO codes (S*/Z*).
+            regex_tokens = re.findall(r'\b([SZ][A-Z0-9]{3})\b', text.upper())
+            deduped_tokens = []
+            for token in regex_tokens:
+                if not deduped_tokens or deduped_tokens[-1] != token:
+                    deduped_tokens.append(token)
+            if len(deduped_tokens) >= 2:
+                icao_tokens = deduped_tokens
 
         if len(icao_tokens) >= 2:
             origin_icao = icao_tokens[0]
