@@ -114,7 +114,6 @@ class RevoBotService:
     def _build_move_id(self, move):
         """Stable identifier used to avoid duplicate notifications."""
         parts = [
-            move.get('source', ''),
             move.get('prefix', ''),
             move.get('origin', ''),
             move.get('destination', ''),
