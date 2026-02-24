@@ -149,6 +149,27 @@ class RevoBotService:
             return f"{base_message}\nLive map: {live_map_url}"
         return base_message
 
+    def _format_weather_alert_message(self, alert, live_map_url=''):
+        """Build human-readable weather alert message."""
+        icao = alert.get('icao', '????')
+        airport_name = alert.get('airport_name', icao)
+        alert_type = alert.get('type', 'METAR')
+        category = alert.get('category', 'N/A')
+        reasons = alert.get('reasons', [])
+
+        lines = [f"Weather alert - {icao} ({airport_name})"]
+        lines.append(f"Type: {alert_type} | Category: {category}")
+        if reasons:
+            lines.append("Reasons:")
+            for reason in reasons[:6]:
+                lines.append(f"- {reason}")
+        raw = str(alert.get('raw', '')).strip()
+        if raw:
+            lines.append(f"Raw: {raw[:300]}")
+        if live_map_url:
+            lines.append(f"Live map: {live_map_url}")
+        return '\n'.join(lines)
+
     def _send_payload(self, payload):
         """Send one webhook call to Revo Bot."""
         if not self.webhook_url:
@@ -320,6 +341,74 @@ class RevoBotService:
         if failures:
             result['failures'] = failures
 
+        return result
+
+    def notify_weather_alerts(self, alerts, live_map_url=None):
+        """Notify Revo Bot for weather alerts."""
+        resolved_live_map_url = self._resolve_live_map_url(live_map_url)
+        total_alerts = len(alerts)
+
+        if total_alerts == 0:
+            return {
+                'enabled': self.enabled,
+                'total_alerts': 0,
+                'sent': 0,
+                'failed': 0,
+                'live_map_url': resolved_live_map_url
+            }
+
+        if not self.enabled:
+            return {
+                'enabled': False,
+                'total_alerts': total_alerts,
+                'sent': 0,
+                'failed': 0,
+                'live_map_url': resolved_live_map_url,
+                'reason': 'Revo Bot disabled or missing REVO_BOT_WEBHOOK_URL'
+            }
+
+        sent_count = 0
+        failed_count = 0
+        failures = []
+
+        for alert in alerts:
+            payload = {
+                'event': 'weather_alert',
+                'message': self._format_weather_alert_message(alert, resolved_live_map_url),
+                'weather_alert': {
+                    'icao': alert.get('icao', ''),
+                    'airport_name': alert.get('airport_name', ''),
+                    'type': alert.get('type', ''),
+                    'category': alert.get('category', ''),
+                    'reasons': alert.get('reasons', []),
+                    'raw': alert.get('raw', ''),
+                    'worst_period': alert.get('worst_period', ''),
+                    'live_map_url': resolved_live_map_url,
+                }
+            }
+
+            ok, status_code, response_text = self._send_payload(payload)
+            if ok:
+                sent_count += 1
+            else:
+                failed_count += 1
+                if len(failures) < 10:
+                    failures.append({
+                        'icao': alert.get('icao', ''),
+                        'type': alert.get('type', ''),
+                        'status_code': status_code,
+                        'error': response_text[:500] if response_text else 'Request failed'
+                    })
+
+        result = {
+            'enabled': True,
+            'total_alerts': total_alerts,
+            'sent': sent_count,
+            'failed': failed_count,
+            'live_map_url': resolved_live_map_url
+        }
+        if failures:
+            result['failures'] = failures
         return result
 
     def notify_dataframe_moves(self, df, source='unknown', live_map_url=None):

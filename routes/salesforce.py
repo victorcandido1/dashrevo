@@ -162,6 +162,28 @@ def upload_rotaer():
         return jsonify({'error': str(e)}), 500
 
 
+@salesforce_bp.route('/weather/check', methods=['POST', 'GET'])
+def check_weather_alerts():
+    """Run weather check and send new Revo Bot weather alerts."""
+    try:
+        from services.weather_alert_service import get_weather_alert_service
+
+        live_map_url = _build_live_map_url()
+        result = get_weather_alert_service().check_and_notify(
+            live_map_url=live_map_url
+        )
+        return jsonify({
+            'success': True,
+            'message': 'Weather check completed',
+            'result': result
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
 @salesforce_bp.route('/summary')
 def get_summary():
     """Get Salesforce data summary"""

@@ -51,9 +51,16 @@ Variáveis opcionais:
 - `REVO_BOT_TIMEOUT_SECONDS` (padrão: `10`)
 - `REVO_BOT_MAX_MOVES_PER_RUN` (padrão: `200`)
 - `REVO_BOT_STATE_FILE` (padrão: `.cache/revo_bot_sent_moves.json`)
+- `REVO_WEATHER_AIRPORTS` (padrão: `SBGR,SBSP,SBMT,SBKP`)
+- `REVO_BOT_WEATHER_STATE_FILE` (padrão: `.cache/revo_bot_weather_alerts.json`)
 
 O sistema evita reenvio duplicado de movimentos já notificados, usando arquivo de estado em cache.
 Cada mensagem enviada ao bot inclui o link do mapa ao vivo.
+
+Para reativar alertas meteorológicos (METAR/TAF), use:
+- `GET/POST /api/salesforce/weather/check`
+
+Esse endpoint consulta AviationWeather e envia apenas alertas novos (sem duplicar avisos já enviados).
 
 ## 🏃 Executando Localmente
 
