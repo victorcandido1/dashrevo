@@ -47,6 +47,15 @@ export REVO_BOT_ENABLED="true"
 export REVO_BOT_LIVE_MAP_URL="https://seu-dominio/tracker"
 ```
 
+Alternativa (sem webhook): enviar via Telegram
+```bash
+export TELEGRAM_BOT_TOKEN="seu-bot-token"
+export TELEGRAM_CHAT_ID="seu-chat-id"
+```
+
+Também suportado:
+`REVO_BOT_TELEGRAM_TOKEN` e `REVO_BOT_TELEGRAM_CHAT_ID`.
+
 Variáveis opcionais:
 - `REVO_BOT_TIMEOUT_SECONDS` (padrão: `10`)
 - `REVO_BOT_MAX_MOVES_PER_RUN` (padrão: `200`)

@@ -20,6 +20,16 @@ class RevoBotService:
     def __init__(self):
         self.webhook_url = os.environ.get('REVO_BOT_WEBHOOK_URL', '').strip()
         self.token = os.environ.get('REVO_BOT_TOKEN', '').strip()
+        self.telegram_token = (
+            os.environ.get('REVO_BOT_TELEGRAM_TOKEN', '').strip()
+            or os.environ.get('TELEGRAM_BOT_TOKEN', '').strip()
+            or os.environ.get('REVO_RADAR_BOT_TOKEN', '').strip()
+        )
+        self.telegram_chat_id = (
+            os.environ.get('REVO_BOT_TELEGRAM_CHAT_ID', '').strip()
+            or os.environ.get('TELEGRAM_CHAT_ID', '').strip()
+            or os.environ.get('REVO_RADAR_CHAT_ID', '').strip()
+        )
         self.live_map_url = os.environ.get('REVO_BOT_LIVE_MAP_URL', '').strip()
         self.timeout_seconds = self._read_int_env('REVO_BOT_TIMEOUT_SECONDS', 10, minimum=1)
         self.max_moves_per_run = self._read_int_env('REVO_BOT_MAX_MOVES_PER_RUN', 200, minimum=1)
@@ -42,7 +52,9 @@ class RevoBotService:
     def _is_enabled(self):
         """Feature toggle via env var + webhook presence."""
         flag = os.environ.get('REVO_BOT_ENABLED', 'true').strip().lower()
-        return bool(self.webhook_url) and flag not in {'0', 'false', 'no', 'off'}
+        has_webhook = bool(self.webhook_url)
+        has_telegram = bool(self.telegram_token and self.telegram_chat_id)
+        return (has_webhook or has_telegram) and flag not in {'0', 'false', 'no', 'off'}
 
     def _get_state_file_path(self):
         """Resolve persisted deduplication state file path."""
@@ -216,6 +228,12 @@ class RevoBotService:
         return '\n'.join(lines)
 
     def _send_payload(self, payload):
+        """Send payload via webhook or Telegram."""
+        if self.webhook_url:
+            return self._send_webhook_payload(payload)
+        return self._send_telegram_payload(payload)
+
+    def _send_webhook_payload(self, payload):
         """Send one webhook call to Revo Bot."""
         if not self.webhook_url:
             return False, None, 'Webhook URL not configured'
@@ -226,6 +244,44 @@ class RevoBotService:
 
         body = json.dumps(payload, ensure_ascii=False).encode('utf-8')
         request = Request(self.webhook_url, data=body, headers=headers, method='POST')
+
+        try:
+            with urlopen(request, timeout=self.timeout_seconds) as response:
+                status_code = getattr(response, 'status', 200)
+                response_text = response.read().decode('utf-8', errors='ignore')
+                if 200 <= status_code < 300:
+                    return True, status_code, response_text
+                return False, status_code, response_text
+        except HTTPError as exc:
+            error_body = exc.read().decode('utf-8', errors='ignore')
+            return False, exc.code, error_body
+        except URLError as exc:
+            return False, None, str(exc)
+        except Exception as exc:
+            return False, None, str(exc)
+
+    def _send_telegram_payload(self, payload):
+        """Send message to Telegram bot when webhook is unavailable."""
+        if not self.telegram_token or not self.telegram_chat_id:
+            return False, None, 'Webhook and Telegram credentials not configured'
+
+        message = str(payload.get('message', '')).strip()
+        if not message:
+            return False, None, 'Empty message payload'
+
+        telegram_url = f"https://api.telegram.org/bot{self.telegram_token}/sendMessage"
+        body = {
+            'chat_id': self.telegram_chat_id,
+            'text': message,
+            'disable_web_page_preview': True,
+        }
+
+        request = Request(
+            telegram_url,
+            data=json.dumps(body, ensure_ascii=False).encode('utf-8'),
+            headers={'Content-Type': 'application/json'},
+            method='POST'
+        )
 
         try:
             with urlopen(request, timeout=self.timeout_seconds) as response:
